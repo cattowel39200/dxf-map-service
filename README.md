@@ -26,6 +26,21 @@ VWORLD_DOMAIN=localhost
 브라우저가 아니라 서버에서 부르면 Referer가 없어 이 값을 명시해야 하기 때문이다.
 배포 후에는 인증키에 등록한 실제 도메인으로 바꾼다.
 
+## 인터넷에 공개하기
+
+무료로 올릴 수 있다. Hugging Face Spaces 는 토큰만 있으면 한 줄로 끝난다.
+
+```powershell
+.\.venv\Scripts\python.exe deploy\deploy_hf.py --token hf_토큰
+```
+
+Render 를 쓰려면 대시보드에서 **New → Blueprint** 로 이 저장소를 고르면
+[render.yaml](render.yaml) 대로 만들어진다. 자세한 절차와 두 방식의 차이는
+[deploy/README.md](deploy/README.md).
+
+배포 후에는 **vworld.kr 인증키의 활용 URL 에 배포 주소를 추가**해야 한다.
+등록하지 않으면 배경지도와 지적 레이어가 나오지 않는다.
+
 ## 데이터 출처
 
 | 레이어 | 출처 | 인증키 |

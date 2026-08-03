@@ -168,12 +168,15 @@ async def create_job(req: Request):
         raise HTTPException(
             503, "지적 레이어를 받으려면 V-World 인증키가 필요합니다.")
 
-    job = jobs.create({
-        "bbox": bbox,
-        "crs": target,
-        "layers": layers,
-        "options": body.get("options", {}),
-    })
+    try:
+        job = jobs.create({
+            "bbox": bbox,
+            "crs": target,
+            "layers": layers,
+            "options": body.get("options", {}),
+        })
+    except jobs.Busy as exc:
+        raise HTTPException(429, str(exc)) from exc
     return JSONResponse({"id": job.id}, status_code=202)
 
 

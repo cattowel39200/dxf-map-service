@@ -20,6 +20,9 @@ MAX_AREA_KM2 = float(os.getenv("MAX_AREA_KM2", "1.0"))
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", ROOT / "output"))
 OUTPUT_TTL_HOURS = float(os.getenv("OUTPUT_TTL_HOURS", "24"))
 
+# 워커가 하나이고 작업 상태를 메모리에 두므로 동시 처리량을 제한한다.
+MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "3"))
+
 # V-World Data API — 연속지적도(부번). 1회 최대 1000건이라 페이징한다.
 VWORLD_DATA_URL = "https://api.vworld.kr/req/data"
 VWORLD_PAGE_SIZE = 1000

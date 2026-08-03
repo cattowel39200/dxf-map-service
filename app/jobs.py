@@ -61,7 +61,22 @@ class Job:
 JOBS: dict[str, Job] = {}
 
 
+class Busy(RuntimeError):
+    pass
+
+
+def running_count() -> int:
+    return sum(1 for j in JOBS.values() if j.state in ("queued", "running"))
+
+
 def create(request: dict) -> Job:
+    # 작업 상태를 메모리에 두고 워커가 하나뿐이라 동시 처리량에 한계가 있다.
+    # 공개 주소로 열어 두면 동시 요청이 몰릴 수 있어 여기서 막는다.
+    if running_count() >= config.MAX_CONCURRENT_JOBS:
+        raise Busy(
+            f"현재 {running_count()}건이 처리 중입니다. "
+            "잠시 후 다시 시도해 주세요."
+        )
     job = Job(id=uuid.uuid4().hex[:12])
     JOBS[job.id] = job
     asyncio.create_task(_run(job, request))

@@ -1,0 +1,27 @@
+# Render 배포 설계도. dashboard.render.com → New → Blueprint 에서 저장소를 고르면
+# 이 파일대로 만들어진다.
+#
+# 무료 플랜은 CPU 0.1 / RAM 512 MB 이고 15분 미사용 시 잠든다. 이 서비스는 등고선
+# 생성과 DXF 조립이 CPU 를 쓰므로 무료 플랜에서는 작업이 수 분 더 걸린다.
+# 상시 사용한다면 starter 플랜을 권한다.
+services:
+  - type: web
+    name: dxf-map-service
+    runtime: docker
+    plan: free
+    region: singapore          # 한국에서 가장 가깝다
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/config
+    envVars:
+      # 값은 Render 대시보드에서 직접 넣는다. 저장소에 두지 않는다.
+      - key: VWORLD_KEY
+        sync: false
+      # 인증키에 등록한 도메인과 같아야 한다. 배포 후 실제 주소로 바꾼다.
+      - key: VWORLD_DOMAIN
+        value: dxf-map-service.onrender.com
+      - key: MAX_AREA_KM2
+        value: "1.0"
+      - key: MAX_CONCURRENT_JOBS
+        value: "2"
+      - key: OUTPUT_TTL_HOURS
+        value: "6"
