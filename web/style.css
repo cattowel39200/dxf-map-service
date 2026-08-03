@@ -7,8 +7,7 @@
   --ok:#2C7A54; --warn:#A9741A; --warn-soft:#FBF1DC; --danger:#B33F36; --danger-soft:#FBE7E4;
   --shadow:0 1px 2px rgba(16,40,44,.06), 0 8px 24px -12px rgba(16,40,44,.22);
   --shadow-lg:0 2px 4px rgba(16,40,44,.07), 0 24px 48px -20px rgba(16,40,44,.35);
-  --l-parcel:#C0453C; --l-label:#7A4B2E; --l-contour:#A5713F;
-  --l-building:#5F7480; --l-road:#C08A22; --l-water:#2E7FA8; --l-ref:#0F5F73;
+  --l-parcel:#C0453C; --l-label:#7A4B2E; --l-ref:#0F5F73;
   --sans:'Pretendard','Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',system-ui,-apple-system,'Segoe UI',sans-serif;
   --mono:ui-monospace,'SF Mono','Cascadia Mono','Consolas','D2Coding',monospace;
 }
@@ -21,8 +20,7 @@
     --ok:#4BB57E; --warn:#D6A445; --warn-soft:#2E2717; --danger:#E0675C; --danger-soft:#331916;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
     --shadow-lg:0 2px 4px rgba(0,0,0,.45), 0 24px 48px -20px rgba(0,0,0,.85);
-    --l-parcel:#E36A5F; --l-label:#D2A077; --l-contour:#C48F5C;
-    --l-building:#8AA3B0; --l-road:#DFAB44; --l-water:#59A8CE; --l-ref:#4FC0DC;
+    --l-parcel:#E36A5F; --l-label:#D2A077; --l-ref:#4FC0DC;
   }
 }
 :root[data-theme="light"]{
@@ -30,16 +28,14 @@
   --line:#D3DDDB; --line-soft:#E4EBEA; --text:#14201F; --text-2:#576867; --text-3:#8B9A99;
   --accent:#0F5F73; --accent-hi:#137A94; --accent-soft:#DFEFF3; --accent-line:#A9D2DD;
   --ok:#2C7A54; --warn:#A9741A; --warn-soft:#FBF1DC; --danger:#B33F36; --danger-soft:#FBE7E4;
-  --l-parcel:#C0453C; --l-label:#7A4B2E; --l-contour:#A5713F;
-  --l-building:#5F7480; --l-road:#C08A22; --l-water:#2E7FA8; --l-ref:#0F5F73;
+  --l-parcel:#C0453C; --l-label:#7A4B2E; --l-ref:#0F5F73;
 }
 :root[data-theme="dark"]{
   --ground:#0A1215; --surface:#101B1F; --panel:#131F24; --sunken:#0D171B;
   --line:#243539; --line-soft:#1B2A2F; --text:#E2ECEB; --text-2:#93A6A6; --text-3:#67797A;
   --accent:#4FC0DC; --accent-hi:#75D2E9; --accent-soft:#10333D; --accent-line:#1E4E5C;
   --ok:#4BB57E; --warn:#D6A445; --warn-soft:#2E2717; --danger:#E0675C; --danger-soft:#331916;
-  --l-parcel:#E36A5F; --l-label:#D2A077; --l-contour:#C48F5C;
-  --l-building:#8AA3B0; --l-road:#DFAB44; --l-water:#59A8CE; --l-ref:#4FC0DC;
+  --l-parcel:#E36A5F; --l-label:#D2A077; --l-ref:#4FC0DC;
 }
 
 *{box-sizing:border-box}

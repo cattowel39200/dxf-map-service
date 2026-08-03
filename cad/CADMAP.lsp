@@ -1,12 +1,12 @@
 ;;; ==========================================================================
-;;;  CADMAP.LSP - 지적도 / 지형도 DXF 가져오기
+;;;  CADMAP.LSP - 지적도 DXF 가져오기
 ;;;
-;;;  AutoCAD 안에서 영역을 지정하면 서버에서 해당 범위의 연속지적도와
-;;;  지형 자료를 받아 현재 도면에 삽입한다.
+;;;  AutoCAD 안에서 영역을 지정하면 서버에서 해당 범위의 연속지적도를
+;;;  받아 현재 도면에 삽입한다.
 ;;;
 ;;;  명령어
-;;;    지적도   (DXFMAP)  두 점으로 영역을 지정해 도면 가져오기
-;;;    지도설정 (MAPCFG)  좌표계 / 레이어 / 등고선간격 / 서버 주소 설정
+;;;    지적도   (DXFMAP)  두 점으로 영역을 지정해 지적도 가져오기
+;;;    지도설정 (MAPCFG)  좌표계 / 추출항목 / 서버 주소 설정
 ;;;    좌표     (PTLABEL) 클릭한 점의 좌표를 도면에 기입
 ;;;
 ;;;  준비
@@ -18,10 +18,9 @@
 (vl-load-com)
 
 ;; --------------------------------------------------------------- 기본 설정
-(if (not *cm:server*)   (setq *cm:server*   "http://localhost:8000"))
+(if (not *cm:server*)   (setq *cm:server*   "https://map.kyoungsungeng.com"))
 (if (not *cm:crs*)      (setq *cm:crs*      "5186"))
-(if (not *cm:layers*)   (setq *cm:layers*   "parcel,pnu,contour,building,road,water"))
-(if (not *cm:interval*) (setq *cm:interval* 5.0))
+(if (not *cm:layers*)   (setq *cm:layers*   "parcel,pnu"))
 (if (not *cm:explode*)  (setq *cm:explode*  T))
 (if (not *cm:limit*)    (setq *cm:limit*    1.0))
 
@@ -134,11 +133,11 @@
     (cm:msg "===== 지도 가져오기 설정 =====")
     (cm:msg (strcat "  서버       : " *cm:server*))
     (cm:msg (strcat "  좌표계     : EPSG:" *cm:crs* "   " (cm:crsname *cm:crs*)))
-    (cm:msg (strcat "  레이어     : " *cm:layers*))
-    (cm:msg (strcat "  등고선간격 : " (cm:num *cm:interval*) " m"))
+    (cm:msg (strcat "  추출 항목  : " *cm:layers*))
     (cm:msg (strcat "  삽입후분해 : " (if *cm:explode* "예" "아니오")))
-    (initget "좌표계 레이어 간격 서버 분해 종료")
-    (setq opt (getkword "\n바꿀 항목 [좌표계/레이어/간격/서버/분해/종료] <종료>: "))
+    (initget "좌표계 항목 서버 분해 종료")
+    (setq opt (getkword "
+바꿀 항목 [좌표계/항목/서버/분해/종료] <종료>: "))
     (cond
       ((= opt "좌표계")
        (cm:msg "사용 가능한 좌표계")
@@ -149,15 +148,11 @@
                 (cm:msg (strcat "EPSG:" k " 로 바꿨습니다.")))
          (if (/= k "") (cm:msg "목록에 없는 코드입니다.")))
        (setq again T))
-      ((= opt "레이어")
-       (cm:msg "parcel=필지경계  pnu=지번지목  contour=등고선")
-       (cm:msg "building=건물   road=도로     water=수계   (쉼표 구분)")
-       (setq k (getstring T (strcat "\n레이어 <" *cm:layers* ">: ")))
+      ((= opt "항목")
+       (cm:msg "parcel=필지경계   pnu=지번지목   (쉼표로 구분)")
+       (setq k (getstring T (strcat "
+추출 항목 <" *cm:layers* ">: ")))
        (if (/= k "") (setq *cm:layers* k))
-       (setq again T))
-      ((= opt "간격")
-       (if (setq n (getreal (strcat "\n등고선 간격 m <" (cm:num *cm:interval*) ">: ")))
-         (setq *cm:interval* n))
        (setq again T))
       ((= opt "서버")
        (setq k (getstring T (strcat "\n서버 주소 <" *cm:server* ">: ")))
@@ -203,8 +198,7 @@
                   "\"layers\":[" (cm:quotelist *cm:layers*) "],"
                   "\"options\":{\"version\":\"AC1024\",\"unit\":\"m\","
                   "\"text_height\":\"auto\","
-                  "\"contour_interval\":" (cm:num *cm:interval*) ","
-                  "\"contour_z\":true,\"origin_shift\":false,"
+                  "\"origin_shift\":false,"
                   "\"reference_marks\":false}}"))
 
         (cm:msg "서버에 요청하는 중...")
@@ -215,7 +209,7 @@
         (cond
           ((null txt)
            (cm:msg (strcat "서버에 연결할 수 없습니다:  " *cm:server*))
-           (cm:msg "run.ps1 로 서버를 먼저 실행하세요."))
+           (cm:msg "주소가 맞는지 지도설정에서 확인하거나, 서버 PC가 켜져 있는지 보세요."))
 
           ((/= code 202)
            (cm:msg (strcat "요청이 거부되었습니다.  HTTP " (itoa code)))
@@ -316,8 +310,8 @@
 
 (cm:msg "==========================================================")
 (cm:msg "  CADMAP 로드 완료")
-(cm:msg "    지적도    영역을 지정해 지적도/지형도 가져오기")
-(cm:msg "    지도설정  좌표계 / 레이어 / 서버 주소 설정")
+(cm:msg "    지적도    영역을 지정해 지적도 가져오기")
+(cm:msg "    지도설정  좌표계 / 추출항목 / 서버 주소 설정")
 (cm:msg "    좌표      클릭한 점의 좌표를 도면에 기입")
 (cm:msg (strcat "  현재 좌표계  EPSG:" *cm:crs* "   " (cm:crsname *cm:crs*)))
 (cm:msg "==========================================================")

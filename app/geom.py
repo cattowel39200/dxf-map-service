@@ -32,7 +32,7 @@ class BBox:
         return self.width_m() * self.height_m() / 1e6
 
     def expanded(self, meters):
-        """등고선처럼 가장자리가 잘리면 어색한 데이터를 위해 여유를 둔다."""
+        """가장자리에 걸치는 자료를 놓치지 않도록 여유를 둔다."""
         dlat = meters / EARTH_R * 180 / math.pi
         dlon = dlat / max(0.2, math.cos(math.radians(self.center[1])))
         return BBox(self.min_lon - dlon, self.min_lat - dlat,

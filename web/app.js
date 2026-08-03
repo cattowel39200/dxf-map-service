@@ -1,4 +1,4 @@
-/* 지적도·지형도 DXF 추출 서비스 — 프론트엔드
+/* 지적도 DXF 추출 서비스 — 프론트엔드
  *
  * 상태바의 좌표 표시는 브라우저 proj4로 즉시 계산하고, 파일에 실제로 쓰이는
  * 확정 좌표는 /api/project로 서버에 물어본다. 구지적(5174)처럼 데이텀 변환
@@ -361,8 +361,6 @@ $('genBtn').onclick = async () => {
       version: $('ver').value,
       unit: $('unit').value,
       text_height: $('txth').value,
-      contour_interval: parseFloat($('cint').value),
-      contour_z: $('sw1').checked,
       origin_shift: $('sw2').checked,
       reference_marks: $('sw3').checked,
     },
@@ -438,10 +436,7 @@ function poll(id) {
 }
 
 const LAY_COLOR = {
-  'D-PARCEL': '--l-parcel', 'D-PNU-TEXT': '--l-label',
-  'T-CONTOUR': '--l-contour', 'T-CONTOUR-INDEX': '--l-contour',
-  'T-BLDG': '--l-building', 'T-ROAD': '--l-road',
-  'T-WATER': '--l-water', 'A-REF': '--l-ref',
+  'D-PARCEL': '--l-parcel', 'D-PNU-TEXT': '--l-label', 'A-REF': '--l-ref',
 };
 
 function showResult(id, st) {
@@ -461,13 +456,7 @@ function showResult(id, st) {
 
   const bd = $('r-bd');
   bd.style.display = '';
-  const demRow = st.dem ? `
-    <div class="bd-row demrow">
-      <span class="swatch fill" style="background:var(--l-contour)"></span>
-      <span>표고자료 · ${st.dem.label}</span>
-      <span class="n">격자 ${st.dem.grid_m} m / 표고단위 ${st.dem.vertical_step_m} m</span>
-    </div>` : '';
-  bd.innerHTML = demRow + st.layers.map(l => `
+  bd.innerHTML = st.layers.map(l => `
     <div class="bd-row">
       <span class="swatch fill" style="background:var(${LAY_COLOR[l.layer] || '--text-3'})"></span>
       <span>${l.name}</span><span class="code">${l.layer}</span>
@@ -519,18 +508,11 @@ $('doneScrim').onclick = e => { if (e.target === $('doneScrim')) $('doneScrim').
     sel.appendChild(og);
   });
 
-  const demTxt = CFG.dem && CFG.dem.count
-    ? `국토지리정보원 DEM ${CFG.dem.count}개`
-    : '표고자료 전지구(15 m)';
   if (CFG.has_vworld_key) {
-    $('keyMsg').textContent = `V-World 연결됨 · ${demTxt}`;
+    $('keyMsg').textContent = 'V-World 연결됨 · 연속지적도';
   } else {
-    $('keyMsg').textContent = `V-World 인증키 미설정 — 지적 레이어 사용 불가 · ${demTxt}`;
+    $('keyMsg').textContent = 'V-World 인증키 미설정 — 지적 레이어를 받을 수 없습니다';
     $('keyDot').classList.add('off');
-  }
-  if (CFG.dem && CFG.dem.count) {
-    $('keyMsg').title = CFG.dem.files
-      .map(f => `${f.name} · 격자 ${f.grid_m} m · ${f.crs}`).join('\n');
   }
 
   refreshScale();

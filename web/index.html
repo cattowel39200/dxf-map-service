@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>지적도·지형도 DXF 추출 서비스</title>
+<title>지적도 DXF 추출 서비스</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.3.1/ol.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -15,12 +15,11 @@
       <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <rect x="1.2" y="1.2" width="29.6" height="29.6" rx="4" stroke="var(--accent)" stroke-width="1.6"/>
         <path d="M1.2 12h29.6M1.2 21h29.6M11 1.2v29.6M21 1.2v29.6" stroke="var(--accent)" stroke-width=".8" opacity=".35"/>
-        <path d="M6 25c3-1.6 4.4-5 7-6.4 2.8-1.5 5.4.6 8-1 2-1.2 2.6-4 5-4.6" stroke="var(--l-contour)" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M11 12h10v9H11z" stroke="var(--l-parcel)" stroke-width="1.6"/>
+        <path d="M6 6h9v6H6zM15 6h11v6H15zM6 12h9v13H6zM15 12h11v13H15z" stroke="var(--l-parcel)" stroke-width="1.4"/>
       </svg>
       <div class="brand-txt">
-        <div class="brand-name">지적·지형 DXF 추출</div>
-        <div class="brand-sub">Cadastral &amp; Terrain → DXF</div>
+        <div class="brand-name">지적도 DXF 추출</div>
+        <div class="brand-sub">Cadastral Map → DXF</div>
       </div>
     </div>
     <div class="topbar-spacer"></div>
@@ -110,32 +109,16 @@
 
         <section class="step">
           <div class="step-head"><span class="step-n">02</span><span class="step-t">추출 레이어</span>
-            <span class="step-hint" id="layState">6개 선택</span></div>
+            <span class="step-hint" id="layState">2개 선택</span></div>
 
           <div class="laygroup">
-            <div class="laygroup-t">지적 · V-World</div>
+            <div class="laygroup-t">추출 항목</div>
             <label class="lay"><input type="checkbox" data-lay="parcel" checked>
               <span class="swatch" style="background:var(--l-parcel)"></span>
               <span class="lay-name">필지 경계</span><span class="lay-code">D-PARCEL</span></label>
             <label class="lay"><input type="checkbox" data-lay="pnu" checked>
               <span class="swatch fill" style="background:var(--l-label);opacity:.7"></span>
               <span class="lay-name">지번 · 지목</span><span class="lay-code">D-PNU-TEXT</span></label>
-          </div>
-
-          <div class="laygroup">
-            <div class="laygroup-t">지형 · DEM + OSM</div>
-            <label class="lay"><input type="checkbox" data-lay="contour" checked>
-              <span class="swatch" style="background:var(--l-contour)"></span>
-              <span class="lay-name">등고선</span><span class="lay-code">T-CONTOUR</span></label>
-            <label class="lay"><input type="checkbox" data-lay="building" checked>
-              <span class="swatch fill" style="background:var(--l-building)"></span>
-              <span class="lay-name">건물</span><span class="lay-code">T-BLDG</span></label>
-            <label class="lay"><input type="checkbox" data-lay="road" checked>
-              <span class="swatch" style="background:var(--l-road);height:4px"></span>
-              <span class="lay-name">도로 경계</span><span class="lay-code">T-ROAD</span></label>
-            <label class="lay"><input type="checkbox" data-lay="water" checked>
-              <span class="swatch" style="background:var(--l-water)"></span>
-              <span class="lay-name">하천 · 수계</span><span class="lay-code">T-WATER</span></label>
           </div>
         </section>
 
@@ -168,11 +151,6 @@
           <div class="optrow"><label for="txth">지번 문자 높이</label>
             <select id="txth"><option value="auto" selected>자동 (영역 폭 연동)</option>
               <option value="1">1.0 m</option><option value="2">2.0 m</option><option value="3">3.0 m</option></select></div>
-          <div class="optrow"><label for="cint">등고선 간격</label>
-            <select id="cint"><option value="1">1 m</option><option value="2">2 m</option>
-              <option value="5" selected>5 m</option><option value="10">10 m</option></select></div>
-          <div class="optrow"><label for="sw1">등고선에 Z값 부여 (3D)</label>
-            <span class="switch"><input type="checkbox" id="sw1" checked><span></span></span></div>
           <div class="optrow"><label for="sw2">좌하단을 (0,0)으로 이동</label>
             <span class="switch"><input type="checkbox" id="sw2"><span></span></span></div>
           <div class="optrow"><label for="sw3">기준점·방위표 함께 삽입</label>
@@ -187,7 +165,7 @@
         </div>
         <div class="summary">
           <div class="sum-row"><span>선택 면적</span><span id="s-area">—</span></div>
-          <div class="sum-row"><span>추출 레이어</span><span id="s-lay">6 개</span></div>
+          <div class="sum-row"><span>추출 레이어</span><span id="s-lay">2 개</span></div>
           <div class="sum-row"><span>좌표계</span><span id="s-crs">—</span></div>
           <div class="sum-row total"><span>1회 추출 한도</span><span id="s-limit">—</span></div>
         </div>
@@ -205,7 +183,7 @@
     <div class="sb"><span class="sb-k">경위도</span><b id="sb-ll">—</b></div>
     <div class="sb"><span class="sb-k">축척</span><b id="sb-scale">—</b></div>
     <div class="sb"><span class="sb-k">CRS</span><b id="sb-crs">—</b></div>
-    <div class="sb grow">출처 국토교통부 V-World · AWS Terrain Tiles · OpenStreetMap</div>
+    <div class="sb grow">출처 국토교통부 V-World 연속지적도</div>
   </footer>
 </div>
 
@@ -227,8 +205,7 @@
       <svg class="fileicon" viewBox="0 0 34 40" fill="none">
         <path d="M1 4a3 3 0 013-3h18l11 11v24a3 3 0 01-3 3H4a3 3 0 01-3-3V4z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.4"/>
         <path d="M22 1l11 11h-8a3 3 0 01-3-3V1z" fill="var(--accent-soft)" stroke="var(--line)" stroke-width="1.4"/>
-        <path d="M6 22h9v7H6z" stroke="var(--l-parcel)" stroke-width="1.3"/>
-        <path d="M17 20c3 .6 4-2 7-1.4M6 32c4-2.4 6.5 1 11-1.6 2-1.2 3.6.4 6-.6" stroke="var(--l-contour)" stroke-width="1.2" stroke-linecap="round"/>
+        <path d="M6 20h10v6H6zM16 20h11v6H16zM6 26h10v7H6zM16 26h11v7H16z" stroke="var(--l-parcel)" stroke-width="1.2"/>
       </svg>
       <div class="fileinfo">
         <div class="filename" id="r-name">—</div>

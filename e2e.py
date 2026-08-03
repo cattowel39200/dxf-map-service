@@ -17,7 +17,7 @@ except (AttributeError, ValueError):
 
 PORT = sys.argv[1] if len(sys.argv) > 1 else "8011"
 BASE = f"http://127.0.0.1:{PORT}"
-# 서울 아차산 — 기복이 있어 등고선이 잘 나오고 건물·도로도 촘촘하다.
+# 서울 광진구 — 필지가 촘촘해 지적도 시험에 적합하다.
 BBOX = [127.020, 37.550, 127.030, 37.557]
 
 
@@ -26,9 +26,7 @@ def main():
     print(f"한도 {cfg['max_area_km2']} km² · V-World 키 "
           f"{'있음' if cfg['has_vworld_key'] else '없음'}")
 
-    layers = ["contour", "building", "road", "water"]
-    if cfg["has_vworld_key"]:
-        layers = ["parcel", "pnu"] + layers
+    layers = ["parcel", "pnu"]
     print(f"요청 레이어: {', '.join(layers)}")
 
     r = httpx.post(f"{BASE}/api/jobs", json={
@@ -36,7 +34,6 @@ def main():
         "crs": "5186",
         "layers": layers,
         "options": {"version": "AC1024", "unit": "m", "text_height": "auto",
-                    "contour_interval": 5, "contour_z": True,
                     "origin_shift": False, "reference_marks": True},
     }, timeout=30)
     if r.status_code != 202:
@@ -78,21 +75,13 @@ def main():
     ents = list(msp)
     xs = [p[0] for e in ents if e.dxftype() == "LWPOLYLINE" for p in e.get_points("xy")]
     ys = [p[1] for e in ents if e.dxftype() == "LWPOLYLINE" for p in e.get_points("xy")]
-    zs = [e.dxf.elevation for e in ents if e.dxftype() == "LWPOLYLINE"
-          and e.dxf.layer.startswith("T-CONTOUR")]
 
-    if st.get("dem"):
-        d = st["dem"]
-        print(f"\n표고자료: {d['label']} · 격자 {d['grid_m']} m · "
-              f"표고단위 {d['vertical_step_m']} m · 등고선간격 {d['interval_m']} m")
     for w in st.get("warnings", []):
         print(f"  [경고] {w}")
 
     print(f"\n검증 - 버전 {doc.dxfversion}, 객체 {len(ents)}개")
     print(f"  X 범위  {min(xs):,.1f} ~ {max(xs):,.1f}")
     print(f"  Y 범위  {min(ys):,.1f} ~ {max(ys):,.1f}")
-    if zs:
-        print(f"  등고선 Z {min(zs):,.1f} ~ {max(zs):,.1f} m")
 
     ok = True
     # 서울 중부원점 좌표대에 들어와야 한다
@@ -103,10 +92,7 @@ def main():
     if not (500 < max(xs) - min(xs) < 1500):
         print("  [FAIL] 도면 폭이 선택 영역과 맞지 않습니다")
         ok = False
-    if zs and not (0 < min(zs) < 500):
-        print("  [FAIL] 등고선 Z값이 비정상입니다")
-        ok = False
-    print("  [OK] 좌표계·범위·Z값 정상" if ok else "")
+    print("  [OK] 좌표계·범위 정상" if ok else "")
     return 0 if ok else 1
 
 

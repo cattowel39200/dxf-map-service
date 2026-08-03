@@ -41,26 +41,12 @@ async def fetch_parcels(box: BBox, progress=None):
     out = []
     page = 1
     total = None
+    # 등록된 도메인을 찾으면 그 뒤로는 계속 그것만 쓴다.
+    domains = list(config.VWORLD_DOMAINS)
     async with httpx.AsyncClient(timeout=config.HTTP_TIMEOUT,
                                  headers={"User-Agent": config.USER_AGENT}) as client:
         while page <= config.VWORLD_MAX_PAGES:
-            params = {
-                "service": "data",
-                "request": "GetFeature",
-                "data": LAYER,
-                "key": config.VWORLD_KEY,
-                "domain": config.VWORLD_DOMAIN,
-                "format": "json",
-                "geometry": "true",
-                "attribute": "true",
-                "crs": "EPSG:4326",
-                "geomFilter": "BOX({},{},{},{})".format(*box.as_tuple()),
-                "size": config.VWORLD_PAGE_SIZE,
-                "page": page,
-            }
-            r = await client.get(config.VWORLD_DATA_URL, params=params)
-            r.raise_for_status()
-            body = r.json().get("response", {})
+            body, domains = await _get_page(client, box, page, domains)
             status = body.get("status")
 
             if status == "NOT_FOUND":
@@ -92,6 +78,41 @@ async def fetch_parcels(box: BBox, progress=None):
             page += 1
 
     return out
+
+
+async def _get_page(client, box, page, domains):
+    """등록된 도메인을 찾을 때까지 순서대로 시도한다.
+
+    성공한 도메인을 목록 맨 앞으로 올려 돌려주므로 다음 페이지부터는 한 번에 된다.
+    """
+    last = None
+    for i, dom in enumerate(domains):
+        params = {
+            "service": "data",
+            "request": "GetFeature",
+            "data": LAYER,
+            "key": config.VWORLD_KEY,
+            "domain": dom,
+            "format": "json",
+            "geometry": "true",
+            "attribute": "true",
+            "crs": "EPSG:4326",
+            "geomFilter": "BOX({},{},{},{})".format(*box.as_tuple()),
+            "size": config.VWORLD_PAGE_SIZE,
+            "page": page,
+        }
+        r = await client.get(config.VWORLD_DATA_URL, params=params)
+        r.raise_for_status()
+        body = r.json().get("response", {})
+        last = body
+        if body.get("status") in ("OK", "NOT_FOUND"):
+            if i:
+                domains = [dom] + [d for d in domains if d != dom]
+            return body, domains
+        # 도메인 문제가 아니면 다른 도메인으로 재시도해도 소용없다
+        if "인증키" not in (body.get("error", {}).get("text") or ""):
+            return body, domains
+    return last or {}, domains
 
 
 def _feature_to_parcel(feature):

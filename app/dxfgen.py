@@ -21,11 +21,6 @@ DXF_VERSIONS = {
 LAYERS = [
     ("D-PARCEL", 1, 25, "필지 경계"),
     ("D-PNU-TEXT", 7, 13, "지번 · 지목"),
-    ("T-CONTOUR", 33, 9, "등고선 주곡선"),
-    ("T-CONTOUR-INDEX", 32, 25, "등고선 계곡선"),
-    ("T-BLDG", 8, 18, "건물"),
-    ("T-ROAD", 2, 18, "도로 경계"),
-    ("T-WATER", 5, 18, "하천 · 수계"),
     ("A-REF", 4, 18, "기준점 · 방위표"),
 ]
 
@@ -134,26 +129,6 @@ class DxfBuilder:
                         self._text(label, (cx, cy + th * 0.7), th, "D-PNU-TEXT")
                     if jimok:
                         self._text(jimok, (cx, cy - th * 0.7), th * 0.85, "D-PNU-TEXT")
-
-    def add_contours(self, contours, with_z=True):
-        for c in contours:
-            pts = self._pts(c["pts"])
-            if len(pts) < 2:
-                continue
-            layer = "T-CONTOUR-INDEX" if c["index"] else "T-CONTOUR"
-            z = c["elev"] * self.scale if (with_z and not self.geographic) else None
-            if with_z and self.geographic:
-                z = c["elev"]
-            self._polyline(pts, layer, closed=False, elevation=z)
-
-    def add_osm(self, features, want):
-        mapping = {"building": "T-BLDG", "road": "T-ROAD", "water": "T-WATER"}
-        for kind, layer in mapping.items():
-            if kind not in want:
-                continue
-            for f in features.get(kind, []):
-                pts = self._pts(f["pts"])
-                self._polyline(pts, layer, closed=f["closed"])
 
     def add_reference_marks(self):
         """좌하단 기준점 십자와 방위표. 원점 이동을 켰을 때 특히 필요하다."""

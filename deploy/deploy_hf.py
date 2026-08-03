@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 API = "https://huggingface.co/api"
 
 FRONTMATTER = """---
-title: 지적도·지형도 DXF 추출
+title: 지적도 DXF 추출
 emoji: 🗺️
 colorFrom: blue
 colorTo: gray
@@ -131,7 +131,7 @@ def main():
         run(["git", "config", "user.name", user], cwd=tmp)
         run(["git", "config", "user.email", f"{user}@users.noreply.huggingface.co"], cwd=tmp)
         run(["git", "add", "-A"], cwd=tmp)
-        run(["git", "commit", "-q", "-m", "지적도·지형도 DXF 추출 서비스"], cwd=tmp)
+        run(["git", "commit", "-q", "-m", "지적도 DXF 추출 서비스"], cwd=tmp)
         remote = f"https://{user}:{args.token}@huggingface.co/spaces/{repo_id}"
         run(["git", "branch", "-M", "main"], cwd=tmp)
         push = run(["git", "push", "-f", remote, "main"], cwd=tmp)

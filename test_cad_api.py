@@ -66,9 +66,8 @@ def main():
         "bbox": [X0, Y0, X1, Y1],
         "bbox_crs": CRS,
         "crs": CRS,
-        "layers": ["parcel", "pnu", "contour"],
+        "layers": ["parcel", "pnu"],
         "options": {"version": "AC1024", "unit": "m", "text_height": "auto",
-                    "contour_interval": 5.0, "contour_z": True,
                     "origin_shift": False, "reference_marks": False},
     }
     r = httpx.post(f"{BASE}/api/jobs", json=body, timeout=30)
@@ -99,13 +98,6 @@ def main():
         print("   ", lisp_jstr(txt, "error"))
         return 1
 
-    # 리습이 "stage_label"을 "label"로 잘못 잡지 않는지 확인
-    dem_label = lisp_jstr(txt, "label")
-    stage_label = lisp_jstr(txt, "stage_label")
-    check("label 파싱이 stage_label과 겹치지 않음",
-          dem_label != stage_label,
-          f"label={dem_label!r}")
-
     elapsed = lisp_jnum(txt, "elapsed")
     size = lisp_jnum(txt, "size")
     check("숫자 파싱", elapsed is not None and size is not None and size > 1000,
@@ -133,8 +125,7 @@ def main():
     # 지켜야 할 조건은 두 가지다.
     #  (1) 요청한 영역을 빠짐없이 덮을 것 — 이게 어긋나면 도면에 구멍이 난다
     #  (2) 바깥으로 나가더라도 설명 가능한 범위일 것
-    #      경계에 걸친 필지는 통째로 살리고, 등고선은 가장자리가 잘리지 않게
-    #      120 m 여유를 두고 만들기 때문에 어느 정도는 넘어가는 게 정상이다.
+    #      경계에 걸친 필지는 자르지 않고 통째로 살리므로 어느 정도는 넘어간다.
     check("요청 영역을 모두 덮음",
           min(xs) <= X0 and max(xs) >= X1 and min(ys) <= Y0 and max(ys) >= Y1,
           f"좌 {X0 - min(xs):+,.0f}  우 {max(xs) - X1:+,.0f}  "

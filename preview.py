@@ -7,14 +7,14 @@ from pathlib import Path
 
 import ezdxf
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 COLOR = {
     "D-PARCEL": ("#C0453C", 0.9),
     "D-PNU-TEXT": ("#7A4B2E", 0.5),
-    "T-CONTOUR": ("#A5713F", 0.45),
-    "T-CONTOUR-INDEX": ("#8A5628", 1.0),
-    "T-BLDG": ("#5F7480", 0.7),
-    "T-ROAD": ("#C08A22", 1.1),
-    "T-WATER": ("#2E7FA8", 1.3),
     "A-REF": ("#0F5F73", 0.8),
 }
 
@@ -68,15 +68,14 @@ def main(src, dst):
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
            f'viewBox="0 0 {W} {H}"><rect width="{W}" height="{H}" fill="#FBFAF7"/>']
 
-    order = ["T-CONTOUR", "T-CONTOUR-INDEX", "T-WATER", "T-ROAD",
-             "T-BLDG", "D-PARCEL", "A-REF", "D-PNU-TEXT"]
+    order = ["D-PARCEL", "A-REF", "D-PNU-TEXT"]
     for layer in order:
         col, lw = COLOR.get(layer, ("#666", 0.6))
         seg = [pts for lay, pts in lines if lay == layer]
         if seg:
             d = " ".join("M" + " L".join(f"{X(p[0]):.1f},{Y(p[1]):.1f}" for p in pts)
                          for pts in seg if len(pts) > 1)
-            fill = "#5F748022" if layer == "T-BLDG" else "none"
+            fill = "none"
             out.append(f'<path d="{d}" fill="{fill}" stroke="{col}" '
                        f'stroke-width="{lw}" stroke-linejoin="round"/>')
 

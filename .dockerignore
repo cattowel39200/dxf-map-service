@@ -5,8 +5,6 @@ __pycache__
 *.pyc
 .env
 output
-dem/*
-!dem/README.md
 cad
 *.dxf
 *.svg

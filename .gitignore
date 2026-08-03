@@ -17,11 +17,6 @@ preview*.svg
 cad_test.dxf
 e2e_download.dxf
 
-# 수치표고모델 원본은 용량이 커서 저장소에 넣지 않는다.
-# 폴더 설명(README.md)만 남긴다.
-dem/*
-!dem/README.md
-
 # 실행 흔적
 server.log
 server.err

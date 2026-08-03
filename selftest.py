@@ -1,9 +1,7 @@
-"""동작 확인용 자체 점검. 인증키 없이 돌아가는 부분만 검사한다.
+"""동작 확인용 자체 점검. 네트워크 없이 도는 부분만 검사한다.
 
-    python selftest.py          # 오프라인 검사만
-    python selftest.py --live   # 표고·OSM 실제 조회까지
+    python selftest.py
 """
-import asyncio
 import sys
 import tempfile
 from pathlib import Path
@@ -11,9 +9,13 @@ from pathlib import Path
 import ezdxf
 
 from app import crs
-from app.contour import build_contours
 from app.dxfgen import DxfBuilder
 from app.geom import BBox, centroid, clip_polygon, clip_polyline
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
 
 FAIL = []
 
@@ -94,43 +96,19 @@ def _fake_parcels(box):
     return out
 
 
-def _fake_contours(box):
-    import numpy as np
-    lons = np.linspace(box.min_lon, box.max_lon, 60)
-    lats = np.linspace(box.min_lat, box.max_lat, 60)
-    gx, gy = np.meshgrid(np.linspace(-2, 2, 60), np.linspace(-2, 2, 60))
-    grid = 50 + 60 * np.exp(-(gx ** 2 + gy ** 2)) + 8 * gx
-    return build_contours(grid, lons, lats, 5.0)
-
 
 def test_dxf():
     print("\n[DXF 생성]")
     box = BBox(126.94, 37.18, 126.95, 37.187)
     parcels = _fake_parcels(box)
-    contours = _fake_contours(box)
-    check("등고선 생성", len(contours) > 5, f"{len(contours)}개 선")
-    check("계곡선 구분", any(c["index"] for c in contours)
-          and any(not c["index"] for c in contours))
-
-    osm = {
-        "building": [{"pts": [(126.942, 37.181), (126.9425, 37.181),
-                              (126.9425, 37.1815), (126.942, 37.1815)],
-                      "closed": True, "name": ""}],
-        "road": [{"pts": [(126.940, 37.183), (126.950, 37.1835)],
-                  "closed": False, "name": "지방도"}],
-        "water": [],
-    }
-
     tmp = Path(tempfile.mkdtemp())
     for version in ("AC1024", "AC1009", "AC1032"):
         for code in ("5186", "5174", "4326"):
             opts = {"version": version, "unit": "m", "text_height": "auto",
-                    "contour_z": True, "origin_shift": False,
+                    "origin_shift": False,
                     "reference_marks": True}
             b = DxfBuilder(code, opts, box)
             b.add_parcels(parcels)
-            b.add_contours(contours)
-            b.add_osm(osm, {"building", "road"})
             b.add_reference_marks()
             path = b.save(tmp / f"t_{version}_{code}.dxf")
 
@@ -140,8 +118,7 @@ def test_dxf():
             texts = [e for e in msp if e.dxftype() == "TEXT"]
             check(f"{version} / EPSG:{code}",
                   "D-PARCEL" in layers and "D-PNU-TEXT" in layers
-                  and "T-CONTOUR" in layers and "T-BLDG" in layers
-                  and len(texts) > 0 and path.stat().st_size > 5000,
+                  and len(texts) > 0 and path.stat().st_size > 3000,
                   f"{len(list(msp))}객체 {path.stat().st_size // 1024}KB")
 
     # 한글 지번이 왕복해도 보존되는지
@@ -152,7 +129,7 @@ def test_dxf():
 
     # 원점 이동을 켜면 좌하단이 0 근처로 와야 한다
     opts = {"version": "AC1024", "unit": "m", "text_height": "auto",
-            "contour_z": True, "origin_shift": True, "reference_marks": False}
+            "origin_shift": True, "reference_marks": False}
     b = DxfBuilder("5186", opts, box)
     b.add_parcels(parcels)
     p = b.save(tmp / "shift.dxf")
@@ -163,7 +140,7 @@ def test_dxf():
 
     # mm 단위는 좌표가 1000배
     opts = {"version": "AC1024", "unit": "mm", "text_height": "auto",
-            "contour_z": True, "origin_shift": True, "reference_marks": False}
+            "origin_shift": True, "reference_marks": False}
     b = DxfBuilder("5186", opts, box)
     b.add_parcels(parcels)
     p = b.save(tmp / "mm.dxf")
@@ -174,29 +151,6 @@ def test_dxf():
           f"{max(xs_mm):.0f}mm vs {max(xs):.0f}m")
 
     print(f"  산출물: {tmp}")
-
-
-async def test_live():
-    print("\n[실제 조회 — 네트워크]")
-    from app.sources import dem, osm as osmsrc
-
-    box = BBox(127.02, 37.55, 127.03, 37.557)   # 서울 아차산 일대
-    try:
-        grid, lons, lats, meta = await dem.load_dem(box)
-        check("표고 자료 조회", grid.size > 1000 and float(grid.max()) > 10,
-              f"{meta['source']} · 격자 {meta['grid_m']} m · {grid.shape} "
-              f"표고 {grid.min():.0f}~{grid.max():.0f} m")
-        cs = build_contours(grid, lons, lats, 5.0)
-        check("실제 등고선", len(cs) > 3, f"{len(cs)}개 선")
-    except Exception as exc:  # noqa: BLE001
-        check("AWS 표고 타일", False, str(exc))
-
-    try:
-        feats = await osmsrc.fetch_features(box)
-        check("OSM 지형지물", sum(len(v) for v in feats.values()) > 0,
-              ", ".join(f"{k} {len(v)}" for k, v in feats.items()))
-    except Exception as exc:  # noqa: BLE001
-        check("OSM 지형지물", False, str(exc))
 
 
 def test_app_imports():
@@ -213,8 +167,6 @@ if __name__ == "__main__":
     test_geom()
     test_dxf()
     test_app_imports()
-    if "--live" in sys.argv:
-        asyncio.run(test_live())
 
     print("\n" + "=" * 52)
     if FAIL:

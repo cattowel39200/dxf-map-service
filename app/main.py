@@ -14,11 +14,11 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config, crs, jobs
 from .geom import BBox
-from .sources import local_dem, vworld
+from .sources import vworld
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
-VALID_LAYERS = {"parcel", "pnu", "contour", "building", "road", "water"}
+VALID_LAYERS = {"parcel", "pnu"}
 TILE_LAYERS = {"Base": "png", "gray": "png", "midnight": "png",
                "Satellite": "jpeg", "Hybrid": "png"}
 
@@ -41,7 +41,7 @@ async def _sweeper():
             pass
 
 
-app = FastAPI(title="지적도·지형도 DXF 추출 서비스", lifespan=lifespan)
+app = FastAPI(title="지적도 DXF 추출 서비스", lifespan=lifespan)
 
 
 @app.get("/api/config")
@@ -52,15 +52,7 @@ async def get_config():
         "crs": crs.catalog(),
         "default_crs": crs.DEFAULT,
         "stages": [{"key": k, "label": v} for k, v in jobs.STAGES],
-        "dem": local_dem.describe(),
     }
-
-
-@app.post("/api/dem/rescan")
-async def dem_rescan():
-    """DEM 폴더에 파일을 새로 넣었을 때 서버 재시작 없이 다시 훑는다."""
-    local_dem.index(refresh=True)
-    return local_dem.describe()
 
 
 @app.get("/api/tiles/{layer}/{z}/{y}/{x}")
