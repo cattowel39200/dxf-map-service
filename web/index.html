@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>지적도·지형도 DXF 추출 서비스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.3.1/ol.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="1.2" y="1.2" width="29.6" height="29.6" rx="4" stroke="var(--accent)" stroke-width="1.6"/>
+        <path d="M1.2 12h29.6M1.2 21h29.6M11 1.2v29.6M21 1.2v29.6" stroke="var(--accent)" stroke-width=".8" opacity=".35"/>
+        <path d="M6 25c3-1.6 4.4-5 7-6.4 2.8-1.5 5.4.6 8-1 2-1.2 2.6-4 5-4.6" stroke="var(--l-contour)" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M11 12h10v9H11z" stroke="var(--l-parcel)" stroke-width="1.6"/>
+      </svg>
+      <div class="brand-txt">
+        <div class="brand-name">지적·지형 DXF 추출</div>
+        <div class="brand-sub">Cadastral &amp; Terrain → DXF</div>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="tb-note"><span class="dot-live" id="keyDot"></span><span id="keyMsg">연결 확인 중</span></div>
+    <button class="ghost-btn" id="themeBtn">◐ 테마</button>
+  </header>
+
+  <div class="workspace">
+
+    <section class="mapwrap">
+      <div id="map" class="rect"></div>
+
+      <div class="map-float searchbar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.6" stroke="var(--text-3)" stroke-width="1.5"/>
+          <path d="M10.5 10.5L14 14" stroke="var(--text-3)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" id="search" placeholder="지번 주소 · 도로명 검색" aria-label="주소 검색">
+        <span class="search-kbd">↵</span>
+      </div>
+
+      <div class="map-float toolstack">
+        <div class="toolgroup" role="group" aria-label="영역 선택 도구">
+          <button class="tool" data-tool="rect" aria-pressed="true">
+            <svg viewBox="0 0 20 20" fill="none"><rect x="3.5" y="5.5" width="13" height="9" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><circle cx="3.5" cy="5.5" r="1.6" fill="currentColor"/><circle cx="16.5" cy="14.5" r="1.6" fill="currentColor"/></svg>
+            <span class="tip">사각형 영역 (드래그)</span>
+          </button>
+          <button class="tool" data-tool="pan" aria-pressed="false">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v7M7 6v5M13 6.5v4.5M16 9v3.5c0 2.5-2.2 4.5-5 4.5-1.7 0-3-.6-4-1.8L4 12c-.5-.7-.3-1.5.4-1.9.6-.4 1.4-.2 1.8.4l.8 1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="tip">지도 이동</span>
+          </button>
+        </div>
+        <div class="toolgroup">
+          <button class="tool" id="clearBtn">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span class="tip">선택 해제</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="map-float basemap-sw" role="group" aria-label="배경지도">
+        <button class="bm" data-bm="Base" aria-pressed="true">일반</button>
+        <button class="bm" data-bm="Satellite" aria-pressed="false">위성</button>
+        <button class="bm" data-bm="gray" aria-pressed="false">백지도</button>
+      </div>
+
+      <div class="map-float zoomstack">
+        <button id="zin" aria-label="확대">+</button>
+        <button id="zout" aria-label="축소">−</button>
+      </div>
+
+      <div class="map-float selchip" id="selchip">
+        <div class="selchip-head">
+          <span class="selchip-title">선택 영역</span>
+          <button class="x-btn" id="chipX" aria-label="선택 해제">✕</button>
+        </div>
+        <dl class="selgrid">
+          <dt>가로 × 세로</dt><dd id="c-dim">—</dd>
+          <dt>면적</dt><dd id="c-area">—</dd>
+          <dt></dt><dd id="c-pyeong" style="color:var(--text-3)">—</dd>
+          <dt>좌하단 X</dt><dd id="c-x">—</dd>
+          <dt>좌하단 Y</dt><dd id="c-y">—</dd>
+        </dl>
+      </div>
+
+      <div class="hint" id="hint">지도 위를 드래그해 추출할 영역을 지정하세요</div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-scroll">
+
+        <section class="step">
+          <div class="step-head"><span class="step-n">01</span><span class="step-t">영역 지정</span>
+            <span class="step-hint" id="areaState">미지정</span></div>
+          <div class="seg" role="group" aria-label="영역 지정 방식">
+            <button data-mode="draw" aria-pressed="true">지도에서 그리기</button>
+            <button data-mode="coord" aria-pressed="false">경위도 입력</button>
+          </div>
+          <div class="coordinput" id="coordinput">
+            <div><label>MIN LON</label><input type="text" id="in-minlon" placeholder="126.9400"></div>
+            <div><label>MIN LAT</label><input type="text" id="in-minlat" placeholder="37.1800"></div>
+            <div><label>MAX LON</label><input type="text" id="in-maxlon" placeholder="126.9500"></div>
+            <div><label>MAX LAT</label><input type="text" id="in-maxlat" placeholder="37.1870"></div>
+            <div class="full"><button class="mini-btn" id="applyCoord">이 영역 적용</button></div>
+          </div>
+        </section>
+
+        <section class="step">
+          <div class="step-head"><span class="step-n">02</span><span class="step-t">추출 레이어</span>
+            <span class="step-hint" id="layState">6개 선택</span></div>
+
+          <div class="laygroup">
+            <div class="laygroup-t">지적 · V-World</div>
+            <label class="lay"><input type="checkbox" data-lay="parcel" checked>
+              <span class="swatch" style="background:var(--l-parcel)"></span>
+              <span class="lay-name">필지 경계</span><span class="lay-code">D-PARCEL</span></label>
+            <label class="lay"><input type="checkbox" data-lay="pnu" checked>
+              <span class="swatch fill" style="background:var(--l-label);opacity:.7"></span>
+              <span class="lay-name">지번 · 지목</span><span class="lay-code">D-PNU-TEXT</span></label>
+          </div>
+
+          <div class="laygroup">
+            <div class="laygroup-t">지형 · DEM + OSM</div>
+            <label class="lay"><input type="checkbox" data-lay="contour" checked>
+              <span class="swatch" style="background:var(--l-contour)"></span>
+              <span class="lay-name">등고선</span><span class="lay-code">T-CONTOUR</span></label>
+            <label class="lay"><input type="checkbox" data-lay="building" checked>
+              <span class="swatch fill" style="background:var(--l-building)"></span>
+              <span class="lay-name">건물</span><span class="lay-code">T-BLDG</span></label>
+            <label class="lay"><input type="checkbox" data-lay="road" checked>
+              <span class="swatch" style="background:var(--l-road);height:4px"></span>
+              <span class="lay-name">도로 경계</span><span class="lay-code">T-ROAD</span></label>
+            <label class="lay"><input type="checkbox" data-lay="water" checked>
+              <span class="swatch" style="background:var(--l-water)"></span>
+              <span class="lay-name">하천 · 수계</span><span class="lay-code">T-WATER</span></label>
+          </div>
+        </section>
+
+        <section class="step">
+          <div class="step-head"><span class="step-n">03</span><span class="step-t">출력 좌표계</span></div>
+          <select id="crs" aria-label="출력 좌표계"></select>
+          <dl class="crs-meta">
+            <dt>투영</dt><dd id="m-proj">—</dd>
+            <dt>타원체</dt><dd id="m-ell">—</dd>
+            <dt>중앙자오선 / 원점위도</dt><dd id="m-orig">—</dd>
+            <dt>단위</dt><dd id="m-unit">—</dd>
+          </dl>
+          <div class="notice" id="crsNote" style="margin-top:10px">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L15 14H1L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.2v3.4M8 11.6v.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span id="crsNoteTxt"></span>
+          </div>
+        </section>
+
+        <section class="step">
+          <div class="step-head"><span class="step-n">04</span><span class="step-t">출력 설정</span></div>
+          <div class="optrow"><label for="ver">DXF 버전</label>
+            <select id="ver">
+              <option value="AC1032">AutoCAD 2018</option>
+              <option value="AC1024" selected>AutoCAD 2010</option>
+              <option value="AC1015">AutoCAD 2000</option>
+              <option value="AC1009">AutoCAD R12</option>
+            </select></div>
+          <div class="optrow"><label for="unit">도면 단위</label>
+            <select id="unit"><option value="m" selected>미터 (m)</option><option value="mm">밀리미터 (mm)</option></select></div>
+          <div class="optrow"><label for="txth">지번 문자 높이</label>
+            <select id="txth"><option value="auto" selected>자동 (영역 폭 연동)</option>
+              <option value="1">1.0 m</option><option value="2">2.0 m</option><option value="3">3.0 m</option></select></div>
+          <div class="optrow"><label for="cint">등고선 간격</label>
+            <select id="cint"><option value="1">1 m</option><option value="2">2 m</option>
+              <option value="5" selected>5 m</option><option value="10">10 m</option></select></div>
+          <div class="optrow"><label for="sw1">등고선에 Z값 부여 (3D)</label>
+            <span class="switch"><input type="checkbox" id="sw1" checked><span></span></span></div>
+          <div class="optrow"><label for="sw2">좌하단을 (0,0)으로 이동</label>
+            <span class="switch"><input type="checkbox" id="sw2"><span></span></span></div>
+          <div class="optrow"><label for="sw3">기준점·방위표 함께 삽입</label>
+            <span class="switch"><input type="checkbox" id="sw3" checked><span></span></span></div>
+        </section>
+      </div>
+
+      <div class="panel-foot">
+        <div class="notice" id="bigNotice">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L15 14H1L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.2v3.4M8 11.6v.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span id="bigNoticeTxt"></span>
+        </div>
+        <div class="summary">
+          <div class="sum-row"><span>선택 면적</span><span id="s-area">—</span></div>
+          <div class="sum-row"><span>추출 레이어</span><span id="s-lay">6 개</span></div>
+          <div class="sum-row"><span>좌표계</span><span id="s-crs">—</span></div>
+          <div class="sum-row total"><span>1회 추출 한도</span><span id="s-limit">—</span></div>
+        </div>
+        <button class="cta" id="genBtn" disabled>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.8v8.6M4.6 7.2L8 10.6l3.4-3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12.4v1.2c0 .4.3.6.7.6h10.6c.4 0 .7-.2.7-.6v-1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span id="genTxt">영역을 먼저 지정하세요</span>
+        </button>
+        <p class="legal">연속지적도는 참고용 도면으로 <b>법적 측량 성과가 아닙니다</b>.<br>경계 확정은 지적측량(LX·한국국토정보공사)이 필요합니다.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <div class="sb"><span class="sb-k">커서</span><b id="sb-xy">—</b></div>
+    <div class="sb"><span class="sb-k">경위도</span><b id="sb-ll">—</b></div>
+    <div class="sb"><span class="sb-k">축척</span><b id="sb-scale">—</b></div>
+    <div class="sb"><span class="sb-k">CRS</span><b id="sb-crs">—</b></div>
+    <div class="sb grow">출처 국토교통부 V-World · AWS Terrain Tiles · OpenStreetMap</div>
+  </footer>
+</div>
+
+<div class="scrim" id="progScrim">
+  <div class="modal">
+    <h2>DXF 생성 중</h2>
+    <p class="msub" id="progSub">—</p>
+    <ul class="stages" id="stages"></ul>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+</div>
+
+<div class="scrim" id="doneScrim">
+  <div class="modal">
+    <h2 id="doneTitle">추출 완료</h2>
+    <p class="msub" id="doneSub">파일은 24시간 동안 보관되며 이후 자동 삭제됩니다.</p>
+    <div id="errBox" class="errbox" style="display:none"></div>
+    <div class="filecard" id="fileCard">
+      <svg class="fileicon" viewBox="0 0 34 40" fill="none">
+        <path d="M1 4a3 3 0 013-3h18l11 11v24a3 3 0 01-3 3H4a3 3 0 01-3-3V4z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.4"/>
+        <path d="M22 1l11 11h-8a3 3 0 01-3-3V1z" fill="var(--accent-soft)" stroke="var(--line)" stroke-width="1.4"/>
+        <path d="M6 22h9v7H6z" stroke="var(--l-parcel)" stroke-width="1.3"/>
+        <path d="M17 20c3 .6 4-2 7-1.4M6 32c4-2.4 6.5 1 11-1.6 2-1.2 3.6.4 6-.6" stroke="var(--l-contour)" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <div class="fileinfo">
+        <div class="filename" id="r-name">—</div>
+        <div class="filemeta" id="r-meta">—</div>
+      </div>
+    </div>
+    <div class="breakdown" id="r-bd"></div>
+    <div class="mrow">
+      <button class="cta" id="dlBtn">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.8v8.6M4.6 7.2L8 10.6l3.4-3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12.4v1.2c0 .4.3.6.7.6h10.6c.4 0 .7-.2.7-.6v-1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        DXF 다운로드
+      </button>
+      <button class="btn-2" id="closeDone">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/ol@10.3.1/dist/ol.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
