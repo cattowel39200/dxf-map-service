@@ -35,7 +35,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.4.0")
+(setq *cm:version* "1.4.1")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -1337,8 +1337,8 @@
   ;; 그래서 취소에 해당하는 글자 (chr 3) 을 직접 넣는다. 끝의 빈칸은 엔터다.
   (strcat (chr 3) (chr 3) cmd " "))
 
-(defun cm:menu ( / )
-  (vl-catch-all-apply
+(defun cm:menu ( / r)
+  (setq r (vl-catch-all-apply
     '(lambda ( / acad mnu m bar)
        (setq acad (vlax-get-acad-object)
              mnu  (vla-get-Menus (vla-Item (vla-get-MenuGroups acad) 0)))
@@ -1354,7 +1354,14 @@
        (vla-AddMenuItem  m 7 "프로그램 삭제" (cm:mac "CMREMOVE"))
        (setq bar (vla-get-MenuBar acad))
        (vla-InsertInMenuBar m (vla-get-Count bar))
-       (if (= (getvar "MENUBAR") 0) (setvar "MENUBAR" 1))))
+       (if (= (getvar "MENUBAR") 0) (setvar "MENUBAR" 1))
+       T)))
+  (not (vl-catch-all-error-p r)))
+
+(defun C:CMMENU ( / )
+  (if (cm:menu)
+    (cm:msg "지적도 메뉴를 다시 만들었습니다.")
+    (cm:msg "메뉴를 만들지 못했습니다. 명령을 직접 치셔서 쓰실 수 있습니다."))
   (princ))
 
 ;; --------------------------------------------------------------- 삽입 후처리
@@ -1623,13 +1630,29 @@
 (defun C:지적도도움말 () (C:CMHELP))
 (defun C:지적도정보   () (C:CMABOUT))
 (defun C:지적도삭제   () (C:CMREMOVE))
+(defun C:지적도메뉴   () (C:CMMENU))
 (defun C:지적도점검   () (C:CMDIAG))
 (defun C:지적도업데이트 () (C:CMUPDATE))
 (defun C:지적도홈     () (C:CMHOME))
 
 ;; --------------------------------------------------------------- 시작 처리
 (cm:load)                                ; 저장해 둔 좌표계·발급키 복원
-(cm:menu)                                ; 풀다운 메뉴 만들기
+(setq *cm:menuok* (cm:menu))             ; 풀다운 메뉴 만들기
+
+;; 시작할 때 만든 메뉴는 곧이어 작업공간이 복원되면서 메뉴 막대와 함께
+;; 감춰지는 일이 있다. 예전에는 acaddoc.lsp 가 도면마다 늦게 돌아 살아
+;; 남았지만, 이제는 시작할 때 한 번만 불린다. 도면이 다 올라온 뒤 한 번
+;; 더 만들어 준다. 이미 있던 S::STARTUP 은 그대로 이어서 부른다.
+(if (not *cm:hooked*)
+  (progn
+    (if (member 'S::STARTUP (atoms-family 0))
+      (setq *cm:oldstartup* S::STARTUP))
+    (setq *cm:hooked* T)
+    (defun S::STARTUP ( / )
+      (if *cm:oldstartup*
+        (vl-catch-all-apply 'apply (list *cm:oldstartup* nil)))
+      (cm:menu)
+      (princ))))
 
 (cm:msg "==========================================================")
 (cm:msg (strcat "  지적도 DXF 가져오기  " *cm:version*
@@ -1641,10 +1664,13 @@
 (cm:msg "    발급키        발급키 등록 및 확인")
 (cm:msg "    좌표          클릭한 점의 좌표를 도면에 기입")
 (cm:msg "    지적도삭제    이 프로그램을 지웁니다")
+(cm:msg "    지적도메뉴    상단 메뉴가 안 보일 때 다시 만듭니다")
 (cm:msg (strcat "  좌표계  EPSG:" *cm:crs* "   " (cm:crsname *cm:crs*)))
 (cm:msg (strcat "  발급키  " (if (= (cm:n *cm:key* "") "")
                                "없음 - 지적도삽입 을 누르시면 자동으로 받습니다"
                                *cm:key*)))
+(if (not *cm:menuok*)
+  (cm:msg "  상단 메뉴는 도면이 열린 뒤에 만들어집니다."))
 (cm:msg "==========================================================")
 
 ;; 새 버전 알림은 하루에 한 번만. 켤 때마다 서버를 부르지 않는다.
