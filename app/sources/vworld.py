@@ -233,9 +233,13 @@ async def fetch_shapes(box: BBox, layer: str, progress=None) -> list[dict]:
                 break
 
             for f in feats:
-                rings = _rings_of(f.get("geometry") or {})
+                geom = f.get("geometry") or {}
+                rings = _rings_of(geom)
                 if rings:
-                    out.append({"props": f.get("properties") or {}, "rings": rings})
+                    # 선 자료(도로 중심선 등)를 닫아 버리면 엉뚱한 면이 된다.
+                    closed = "Line" not in str(geom.get("type") or "")
+                    out.append({"props": f.get("properties") or {},
+                                "rings": rings, "closed": closed})
 
             if total is None:
                 try:

@@ -182,13 +182,14 @@ class DxfBuilder:
             self._ensure_layer(layer, color, f"{spec['label']} · {kind}")
 
             first = None
+            shut = s.get("closed", True)
             for ring in s.get("rings") or []:
                 pts = self._pts(ring)
                 if len(pts) < 2:
                     continue
                 if first is None:
                     first = pts
-                self._polyline(pts, layer, closed=len(pts) >= 3)
+                self._polyline(pts, layer, closed=shut and len(pts) >= 3)
 
             if draw_label and kind and first and len(first) >= 3:
                 cx = sum(x for x, _ in first) / len(first)

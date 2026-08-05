@@ -171,7 +171,8 @@ def _assemble(job_id, box, target, options, layers, parcels, shapes=None):
         got = (shapes or {}).get(spec["key"])
         if got:
             b.add_planning(spec, got,
-                           sub_layers=options.get("plan_sub_layers", True),
+                           sub_layers=(options.get("plan_sub_layers", True)
+                                       and spec["key"] not in layerdef.NO_SPLIT),
                            draw_label=options.get("plan_labels", False))
     if options.get("reference_marks", True):
         b.add_reference_marks()
