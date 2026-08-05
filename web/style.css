@@ -51,10 +51,10 @@ button{font:inherit;color:inherit}
 .topbar{display:flex;align-items:center;gap:18px;height:52px;flex:0 0 auto;padding:0 16px;
   background:var(--panel);border-bottom:1px solid var(--line);z-index:5}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
-.mark{width:26px;height:26px;flex:0 0 auto}
+.mark{width:30px;height:30px;flex:0 0 auto;object-fit:contain;display:block}
 .brand-txt{display:flex;flex-direction:column;line-height:1.15}
 .brand-name{font-weight:700;font-size:14px;letter-spacing:-.02em}
-.brand-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3)}
+.brand-sub{font-size:10.5px;color:var(--text-3);letter-spacing:-.01em}
 .topbar-spacer{flex:1}
 .tb-note{font-size:11.5px;color:var(--text-3);display:flex;align-items:center;gap:6px}
 .dot-live{width:6px;height:6px;border-radius:50%;background:var(--ok);
@@ -63,6 +63,10 @@ button{font:inherit;color:inherit}
 .ghost-btn{background:transparent;border:1px solid var(--line);border-radius:6px;
   padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text-2)}
 .ghost-btn:hover{border-color:var(--accent-line);color:var(--accent-hi);background:var(--accent-soft)}
+/* 아이콘만 있는 작은 버튼. 상단바 오른쪽 끝의 사용 현황 바로가기에 쓴다. */
+.icon-btn{display:inline-grid;place-items:center;width:30px;height:27px;padding:0;
+  text-decoration:none;flex:0 0 auto}
+.icon-btn svg{width:14px;height:14px;display:block}
 
 .workspace{flex:1;display:flex;min-height:0}
 
@@ -81,9 +85,42 @@ button{font:inherit;color:inherit}
 .searchbar input::placeholder{color:var(--text-3)}
 .search-kbd{font-family:var(--mono);font-size:10px;color:var(--text-3);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
 
+/* 검색창 안의 즐겨찾기 버튼 */
+.sb-btn{border:0;background:transparent;cursor:pointer;color:var(--text-3);padding:3px;
+  display:inline-flex;align-items:center;gap:3px;border-radius:5px;flex:0 0 auto}
+.sb-btn svg{width:15px;height:15px;display:block}
+.sb-btn:hover{color:var(--accent-hi);background:var(--accent-soft)}
+.sb-btn.on{color:var(--accent-hi)}
+.sb-btn.saved svg path{fill:currentColor}
+.fav-n{font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums}
+
+/* 즐겨찾기 목록 */
+.favpanel{top:60px;left:14px;width:296px;max-height:min(52vh,420px);display:none;
+  flex-direction:column;background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;box-shadow:var(--shadow-lg);overflow:hidden}
+.favpanel.on{display:flex}
+.fav-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 10px 9px 12px;border-bottom:1px solid var(--line-soft)}
+.fav-title{font-size:12px;font-weight:650}
+.fav-list{overflow-y:auto;overscroll-behavior:contain}
+.fav{display:flex;align-items:center;gap:9px;padding:8px 10px 8px 12px;cursor:pointer;
+  border-bottom:1px solid var(--line-soft)}
+.fav:last-child{border-bottom:0}
+.fav:hover{background:var(--sunken)}
+.fav-body{min-width:0;flex:1}
+.fav-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fav-meta{font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:1px}
+.fav-del{border:0;background:transparent;cursor:pointer;color:var(--text-3);
+  font-size:13px;line-height:1;padding:3px 4px;border-radius:4px;flex:0 0 auto}
+.fav-del:hover{color:var(--danger);background:var(--danger-soft)}
+.fav-empty{padding:22px 14px;text-align:center;color:var(--text-3);font-size:11.5px;line-height:1.6}
+
 .toolstack{top:70px;left:14px;display:flex;flex-direction:column;gap:8px}
 .toolgroup{background:var(--panel);border:1px solid var(--line);border-radius:8px;
-  box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+  box-shadow:var(--shadow);display:flex;flex-direction:column}
+.toolgroup .tool:first-child{border-radius:7px 7px 0 0}
+.toolgroup .tool:last-child{border-radius:0 0 7px 7px}
+.toolgroup .tool:only-child{border-radius:7px}
 .tool{width:38px;height:38px;display:grid;place-items:center;background:transparent;border:0;
   cursor:pointer;color:var(--text-2);border-bottom:1px solid var(--line-soft);position:relative}
 .toolgroup .tool:last-child{border-bottom:0}
@@ -91,8 +128,11 @@ button{font:inherit;color:inherit}
 .tool[aria-pressed="true"]{background:var(--accent);color:#fff}
 .tool svg{width:17px;height:17px}
 .tool .tip{position:absolute;left:46px;top:50%;transform:translateY(-50%);white-space:nowrap;
-  background:var(--text);color:var(--panel);font-size:11px;padding:4px 8px;border-radius:5px;
-  opacity:0;pointer-events:none;transition:opacity .12s;z-index:9}
+  background:var(--text);color:var(--panel);font-size:11.5px;font-weight:500;
+  padding:5px 10px;border-radius:6px;box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:opacity .12s;z-index:20}
+.tool .tip::before{content:"";position:absolute;right:100%;top:50%;transform:translateY(-50%);
+  border:5px solid transparent;border-right-color:var(--text)}
 .tool:hover .tip{opacity:1}
 
 .basemap-sw{bottom:16px;left:14px;display:flex;background:var(--panel);border:1px solid var(--line);

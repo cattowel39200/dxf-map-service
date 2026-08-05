@@ -361,6 +361,105 @@ $('search').addEventListener('keydown', async e => {
   }
 });
 
+/* ── 지번 즐겨찾기 ──────────────────────────────
+   로그인이 없으므로 이 브라우저에만 저장한다(localStorage).
+   저장할 때 화면 중앙에 걸린 필지의 지번을 기본 이름으로 채워 준다. */
+const FAV_KEY = 'ksFavorites';
+
+function favLoad() {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY)) || []; }
+  catch { return []; }
+}
+function favSave(list) {
+  localStorage.setItem(FAV_KEY, JSON.stringify(list));
+  favRender();
+}
+
+/* 지도 중앙에 있는 필지의 지번을 찾는다. 미리보기가 떠 있을 때만 된다. */
+function jibunAtCenter() {
+  const c = map.getView().getCenter();
+  let hit = null;
+  parcelSource.forEachFeatureAtCoordinateDirect(c, f => { hit = hit || f; });
+  if (!hit) {
+    // 필지 안이 아니면 가장 가까운 필지로 대신한다
+    let best = Infinity;
+    parcelSource.forEachFeature(f => {
+      const e = f.getGeometry().getExtent();
+      const d = Math.hypot((e[0] + e[2]) / 2 - c[0], (e[1] + e[3]) / 2 - c[1]);
+      if (d < best) { best = d; hit = f; }
+    });
+    if (best > 60) hit = null;   // 60 m 넘게 떨어지면 쓰지 않는다
+  }
+  if (!hit) return '';
+  const j = hit.get('jibun') || '';
+  const m = hit.get('jimok') || '';
+  return j ? (m ? `${j} ${m}` : j) : '';
+}
+
+function favRender() {
+  const list = favLoad();
+  $('favCount').textContent = list.length || '';
+  const box = $('favList');
+  if (!list.length) {
+    box.innerHTML = `<div class="fav-empty">저장된 지번이 없습니다.<br>
+      지도를 옮긴 뒤 ★ 버튼을 누르면 추가됩니다.</div>`;
+    return;
+  }
+  box.innerHTML = list.map((f, i) => `
+    <div class="fav" data-i="${i}">
+      <div class="fav-body">
+        <div class="fav-name">${f.name.replace(/</g, '&lt;')}</div>
+        <div class="fav-meta">${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} · 축척 ${Math.round(f.zoom)}</div>
+      </div>
+      <button class="fav-del" data-del="${i}" title="삭제" aria-label="삭제">✕</button>
+    </div>`).join('');
+
+  box.querySelectorAll('.fav').forEach(el => el.onclick = e => {
+    if (e.target.closest('.fav-del')) return;
+    const f = favLoad()[+el.dataset.i];
+    if (!f) return;
+    map.getView().animate({
+      center: ol.proj.fromLonLat([f.lon, f.lat]), zoom: f.zoom, duration: 450,
+    });
+    $('favPanel').classList.remove('on');
+    $('favToggle').classList.remove('on');
+  });
+  box.querySelectorAll('.fav-del').forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const list = favLoad();
+    list.splice(+b.dataset.del, 1);
+    favSave(list);
+  });
+}
+
+$('favAdd').onclick = () => {
+  const v = map.getView();
+  const [lon, lat] = ol.proj.toLonLat(v.getCenter());
+  const guess = jibunAtCenter() || $('search').value.trim()
+    || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  const name = prompt('즐겨찾기 이름 (지번)', guess);
+  if (name === null) return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const list = favLoad();
+  list.unshift({ name: trimmed, lon, lat, zoom: v.getZoom(), at: Date.now() });
+  favSave(list.slice(0, 100));
+  $('favAdd').classList.add('saved');
+  setTimeout(() => $('favAdd').classList.remove('saved'), 900);
+};
+
+$('favToggle').onclick = () => {
+  const on = $('favPanel').classList.toggle('on');
+  $('favToggle').classList.toggle('on', on);
+  if (on) favRender();
+};
+$('favClose').onclick = () => {
+  $('favPanel').classList.remove('on');
+  $('favToggle').classList.remove('on');
+};
+
+favRender();
+
 /* ── 생성 · 폴링 · 다운로드 ────────────────────── */
 let pollTimer = null;
 
@@ -522,9 +621,9 @@ $('doneScrim').onclick = e => { if (e.target === $('doneScrim')) $('doneScrim').
   });
 
   if (CFG.has_vworld_key) {
-    $('keyMsg').textContent = 'V-World 연결됨 · 연속지적도';
+    $('keyMsg').textContent = '연속지적도 다운로드 가능';
   } else {
-    $('keyMsg').textContent = 'V-World 인증키 미설정 — 지적 레이어를 받을 수 없습니다';
+    $('keyMsg').textContent = '연속지적도 다운로드 안됨';
     $('keyDot').classList.add('off');
   }
 
