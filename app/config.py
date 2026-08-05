@@ -33,8 +33,16 @@ VWORLD_DATA_URL = "https://api.vworld.kr/req/data"
 VWORLD_PAGE_SIZE = 1000
 VWORLD_MAX_PAGES = 40
 
-# V-World WMTS 타일 (배경지도). 키를 노출하지 않도록 백엔드에서 중계한다.
+# V-World WMTS 타일 (배경지도).
 VWORLD_TILE_URL = "https://api.vworld.kr/req/wmts/1.0.0/{key}/{layer}/{z}/{y}/{x}.{ext}"
+
+# 배경지도를 브라우저가 V-World에서 직접 받게 할지 여부.
+#   1 (기본) 브라우저 → V-World 직결. 타일 장당 약 17 ms. 대신 인증키가
+#            프론트엔드에 노출된다. 키는 도메인에 묶여 있어 다른 사이트에서는
+#            배경지도가 뜨지 않는다.
+#   0        서버가 중계. 키는 감춰지지만 Cloudflare를 한 번 더 거쳐 약 57 ms.
+# 어느 쪽이든 지적 데이터 조회(Data API)는 항상 서버가 대신 한다.
+TILE_DIRECT = os.getenv("TILE_DIRECT", "1") == "1"
 
 
 

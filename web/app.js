@@ -24,13 +24,25 @@ let CFG = null;
 let crsInfo = {};
 
 /* ── 지도 ─────────────────────────────────────── */
-const basemapSource = layer => new ol.source.XYZ({
-  url: `/api/tiles/${layer}/{z}/{y}/{x}`,
-  maxZoom: 19,
-  crossOrigin: 'anonymous',
-});
+/* 배경지도는 V-World에서 브라우저가 직접 받는다(장당 약 17 ms).
+   서버 중계로 돌리려면 .env 에 TILE_DIRECT=0 을 넣는다(약 57 ms).
+   어느 쪽이든 지적 데이터는 서버가 대신 조회한다. */
+const basemapSource = layer => {
+  let url;
+  if (CFG && CFG.tile_direct && CFG.tile_url) {
+    const ext = (CFG.tile_layers && CFG.tile_layers[layer]) || 'png';
+    url = CFG.tile_url
+      .replace('{layer}', layer)
+      .replace('{ext}', ext);
+  } else {
+    url = `/api/tiles/${layer}/{z}/{y}/{x}`;
+  }
+  return new ol.source.XYZ({ url, maxZoom: 19, crossOrigin: 'anonymous' });
+};
 
-const baseLayer = new ol.layer.Tile({ source: basemapSource('Base') });
+/* CFG를 받기 전이라 소스는 boot()에서 붙인다. */
+let currentBasemap = 'Base';
+const baseLayer = new ol.layer.Tile();
 
 const parcelSource = new ol.source.Vector();
 const parcelLayer = new ol.layer.Vector({
@@ -282,7 +294,8 @@ document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => {
 });
 document.querySelectorAll('[data-bm]').forEach(b => b.onclick = () => {
   document.querySelectorAll('[data-bm]').forEach(x => x.setAttribute('aria-pressed', x === b));
-  baseLayer.setSource(basemapSource(b.dataset.bm));
+  currentBasemap = b.dataset.bm;
+  baseLayer.setSource(basemapSource(currentBasemap));
 });
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
   document.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b));
@@ -514,6 +527,9 @@ $('doneScrim').onclick = e => { if (e.target === $('doneScrim')) $('doneScrim').
     $('keyMsg').textContent = 'V-World 인증키 미설정 — 지적 레이어를 받을 수 없습니다';
     $('keyDot').classList.add('off');
   }
+
+  // CFG를 받은 뒤에야 배경지도 소스를 정할 수 있다(직결/중계 판단).
+  baseLayer.setSource(basemapSource(currentBasemap));
 
   refreshScale();
   refreshSummary();

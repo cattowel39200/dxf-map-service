@@ -54,6 +54,12 @@ async def get_config():
         "crs": crs.catalog(),
         "default_crs": crs.DEFAULT,
         "stages": [{"key": k, "label": v} for k, v in jobs.STAGES],
+        # 직결 모드일 때만 배경지도용 인증키를 내려준다. 지적 조회는 이 값과
+        # 무관하게 언제나 서버가 대신 호출한다.
+        "tile_direct": config.TILE_DIRECT,
+        "tile_url": (config.VWORLD_TILE_URL.replace("{key}", config.VWORLD_KEY)
+                     if config.TILE_DIRECT and config.VWORLD_KEY else None),
+        "tile_layers": TILE_LAYERS,
     }
 
 
