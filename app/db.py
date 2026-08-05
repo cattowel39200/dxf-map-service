@@ -82,6 +82,16 @@ CREATE TABLE IF NOT EXISTS licenses (
     note       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_lic_email ON licenses(email);
+
+-- PC 이전 이력. 자가 이전이 잦으면 여기서 드러난다.
+CREATE TABLE IF NOT EXISTS transfers (
+    key      TEXT NOT NULL,
+    at       REAL NOT NULL,
+    old_pc   TEXT,
+    new_pc   TEXT,
+    by_admin INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_tr_key ON transfers(key, at);
 """
 
 

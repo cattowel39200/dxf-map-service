@@ -43,6 +43,11 @@ BANK_INFO = os.getenv("BANK_INFO", "")
 # 데모 사용 기간(일). 첫 사용 시점부터 센다.
 DEMO_DAYS = int(os.getenv("DEMO_DAYS", "3"))
 
+# PC를 바꿨을 때 스스로 옮길 수 있는 간격(일).
+# 윈도우 재설치나 PC 교체로 지문이 바뀌어도 관리자를 기다리지 않게 하되,
+# 두 대를 번갈아 쓰는 것은 막을 만큼 길게 둔다. 0이면 자가 이전을 끈다.
+TRANSFER_COOLDOWN_DAYS = int(os.getenv("TRANSFER_COOLDOWN_DAYS", "30"))
+
 SITE_URL = os.getenv("SITE_URL", "https://ks-down-map.com")
 
 # 소개 페이지에 띄울 유튜브 영상 ID (주소의 v= 뒤 11자). 비우면 자리만 표시한다.

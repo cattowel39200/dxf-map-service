@@ -318,6 +318,8 @@ function licBlock(l) {
   const until = l.expires_at
     ? new Date(l.expires_at * 1000).toLocaleDateString('ko-KR') + '까지'
     : '기간 제한 없음';
+  const tr = l.transfers || { count: 0 };
+  const trTxt = tr.count ? ` · PC이전 ${tr.count}회` : '';
   const acts = [
     l.kind === 'demo' ? `<button class="sbtn" data-lic="upgrade" data-key="${l.key}">정품 전환</button>` : '',
     `<button class="sbtn" data-lic="reset-machine" data-key="${l.key}">PC 해제</button>`,
@@ -325,7 +327,7 @@ function licBlock(l) {
   ].join('');
   return `<div>
     <div class="licline"><span class="lickey">${l.key}</span>${badges}</div>
-    <div class="licmeta">${l.machine ? 'PC 등록됨' : 'PC 미등록'} · 사용 ${l.uses}회 · ${until}</div>
+    <div class="licmeta">${l.machine ? 'PC 등록됨' : 'PC 미등록'} · 사용 ${l.uses}회 · ${until}${trTxt}</div>
     <div class="licline" style="margin-top:3px">${acts}</div>
   </div>`;
 }

@@ -67,8 +67,14 @@ def list_applicants() -> list[dict]:
         c = db.connect()
         rows = c.execute("SELECT * FROM applicants ORDER BY created DESC LIMIT 500").fetchall()
         lic = {}
+        tr = {}
+        for x in c.execute("SELECT key, COUNT(*) n, MAX(at) last FROM transfers"
+                           " GROUP BY key").fetchall():
+            tr[x["key"]] = {"count": x["n"], "last": x["last"]}
         for l in c.execute("SELECT * FROM licenses ORDER BY issued").fetchall():
-            lic.setdefault(l["email"], []).append(dict(l))
+            d = dict(l)
+            d["transfers"] = tr.get(d["key"], {"count": 0, "last": None})
+            lic.setdefault(l["email"], []).append(d)
     out = []
     for r in rows:
         d = dict(r)
@@ -175,12 +181,24 @@ def revoke(key: str, on: bool = True) -> dict | None:
 
 
 def reset_machine(key: str) -> dict | None:
-    """PC를 바꿨을 때 관리자가 묶임을 풀어 준다."""
+    """PC 묶임을 관리자가 풀어 준다. 다음에 실행한 PC로 등록된다."""
     with db.lock():
         c = db.connect()
+        r = c.execute("SELECT machine FROM licenses WHERE key=?", (key,)).fetchone()
+        if r and r["machine"]:
+            c.execute("INSERT INTO transfers (key, at, old_pc, new_pc, by_admin)"
+                      " VALUES (?,?,?,NULL,1)", (key, time.time(), r["machine"]))
         c.execute("UPDATE licenses SET machine=NULL, machine_at=NULL WHERE key=?", (key,))
         c.commit()
     return get_license(key)
+
+
+def transfers(key: str) -> list[dict]:
+    with db.lock():
+        rows = db.connect().execute(
+            "SELECT * FROM transfers WHERE key=? ORDER BY at DESC LIMIT 20",
+            (key,)).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_license(key: str) -> dict | None:
@@ -192,7 +210,9 @@ def get_license(key: str) -> dict | None:
 
 def _lic_view(d: dict) -> dict:
     d = dict(d)
+    d.pop("transferred", None)
     d["revoked"] = bool(d.get("revoked"))
+    d.setdefault("transfers", {"count": 0, "last": None})
     d["expires_at"] = _expiry(d)
     d["expired"] = bool(d["expires_at"] and time.time() > d["expires_at"])
     return d
@@ -230,16 +250,34 @@ def check(key: str, machine: str | None) -> dict:
         if d["revoked"]:
             return {"ok": False, "reason": "사용이 중지된 키입니다. 관리자에게 문의하세요."}
 
-        # PC 묶기 — 처음 쓴 PC를 기억하고 이후 다른 PC는 막는다
+        # PC 묶기 — 처음 쓴 PC를 기억한다. 이후 다른 PC에서 쓰면,
+        # 마지막 등록으로부터 유예 기간이 지났을 때만 스스로 옮길 수 있다.
+        # PC를 바꾸거나 윈도우를 다시 깔았을 때 관리자를 기다리지 않게 하되,
+        # 두 대를 번갈아 쓰는 것은 막는다.
         if machine:
             if not d["machine"]:
                 c.execute("UPDATE licenses SET machine=?, machine_at=? WHERE key=?",
                           (machine, now, key))
                 d["machine"] = machine
             elif d["machine"] != machine:
-                c.commit()
-                return {"ok": False,
-                        "reason": "다른 PC에 등록된 키입니다. 1대에서만 쓸 수 있습니다."}
+                cool = config.TRANSFER_COOLDOWN_DAYS * 86400
+                since = now - (d["machine_at"] or d["issued"] or now)
+                if cool and since >= cool:
+                    c.execute("INSERT INTO transfers (key, at, old_pc, new_pc, by_admin)"
+                              " VALUES (?,?,?,?,0)", (key, now, d["machine"], machine))
+                    c.execute("UPDATE licenses SET machine=?, machine_at=? WHERE key=?",
+                              (machine, now, key))
+                    d["machine"] = machine
+                    d["transferred"] = True
+                else:
+                    left = (cool - since) / 86400 if cool else None
+                    c.commit()
+                    msg = "다른 PC에 등록된 키입니다. 1대에서만 쓸 수 있습니다."
+                    if cool:
+                        msg += (f" {left:.0f}일 뒤에는 이 PC로 자동으로 옮길 수 있고,"
+                                " 그전에 옮기시려면 관리자에게 문의해 주세요.")
+                    return {"ok": False, "reason": msg,
+                            "transfer_in_days": round(left, 1) if left else None}
 
         if not d["first_use"]:
             c.execute("UPDATE licenses SET first_use=? WHERE key=?", (now, key))
@@ -254,8 +292,11 @@ def check(key: str, machine: str | None) -> dict:
         c.execute("UPDATE licenses SET last_use=?, uses=uses+1 WHERE key=?", (now, key))
         c.commit()
 
-    return {
+    out = {
         "ok": True, "kind": d["kind"], "expires_at": exp,
         "days_left": round((exp - now) / 86400, 2) if exp else None,
         "reason": "",
     }
+    if d.get("transferred"):
+        out["notice"] = "이 PC로 사용 등록을 옮겼습니다. 이전 PC에서는 더 이상 쓸 수 없습니다."
+    return out
