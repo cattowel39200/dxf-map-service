@@ -33,7 +33,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.0.0")
+(setq *cm:version* "1.0.1")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -512,6 +512,13 @@
 ;; ====================================================== 풀다운 메뉴
 ;; 파일을 건드리지 않고 메모리에만 만든다. AutoCAD 를 끄면 사라지고
 ;; 다시 켤 때 이 파일이 불리면서 새로 만들어진다.
+(defun cm:mac (cmd)
+  ;; 메뉴에 넣을 명령을 만든다.
+  ;; 메뉴 파일(cuix)로 불러온 매크로는 AutoCAD 가 "^C^C" 를 취소로 바꿔 주지만,
+  ;; 여기처럼 ActiveX 로 만든 메뉴는 바꿔 주지 않고 글자 그대로 명령창에 찍는다.
+  ;; 그래서 취소에 해당하는 글자 (chr 3) 을 직접 넣는다. 끝의 빈칸은 엔터다.
+  (strcat (chr 3) (chr 3) cmd " "))
+
 (defun cm:menu ( / )
   (vl-catch-all-apply
     '(lambda ( / acad mnu m bar)
@@ -520,14 +527,14 @@
        ;; 이미 있으면 지운다 (다시 불러도 겹치지 않게)
        (vl-catch-all-apply '(lambda () (vla-Delete (vla-Item mnu "지적도"))))
        (setq m (vla-Add mnu "지적도"))
-       (vla-AddMenuItem  m 1 "지적도 가져오기"  "^C^C지적도 ")
-       (vla-AddMenuItem  m 2 "좌표 기입"        "^C^C좌표 ")
+       (vla-AddMenuItem  m 1 "지적도 가져오기"  (cm:mac "DXFMAP"))
+       (vla-AddMenuItem  m 2 "좌표 기입"        (cm:mac "PTLABEL"))
        (vla-AddSeparator m 3)
-       (vla-AddMenuItem  m 4 "지도 설정"        "^C^C지도설정 ")
-       (vla-AddMenuItem  m 5 "발급키 등록"      "^C^C발급키 ")
+       (vla-AddMenuItem  m 4 "지도 설정"        (cm:mac "MAPCFG"))
+       (vla-AddMenuItem  m 5 "발급키 등록"      (cm:mac "CMKEY"))
        (vla-AddSeparator m 6)
-       (vla-AddMenuItem  m 7 "업데이트 확인"    "^C^C지적도업데이트 ")
-       (vla-AddMenuItem  m 8 "홈페이지 열기"    "^C^C지적도홈 ")
+       (vla-AddMenuItem  m 7 "업데이트 확인"    (cm:mac "CMUPDATE"))
+       (vla-AddMenuItem  m 8 "홈페이지 열기"    (cm:mac "CMHOME"))
        (setq bar (vla-get-MenuBar acad))
        (vla-InsertInMenuBar m (vla-get-Count bar))
        (if (= (getvar "MENUBAR") 0) (setvar "MENUBAR" 1))))
