@@ -51,6 +51,37 @@ CREATE TABLE IF NOT EXISTS notices (
     updated  REAL
 );
 CREATE INDEX IF NOT EXISTS idx_notices_active ON notices(active, created);
+
+-- 사용 신청자. 이메일 하나가 곧 한 사람이다.
+CREATE TABLE IF NOT EXISTS applicants (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    email     TEXT NOT NULL UNIQUE,
+    name      TEXT,
+    company   TEXT,
+    memo      TEXT,
+    ip        TEXT,
+    created   REAL NOT NULL,
+    sent_demo REAL,                      -- 데모 발송 시각
+    sent_full REAL,                      -- 정품 발송 시각
+    status    TEXT NOT NULL DEFAULT 'new'  -- new | demo | paid | blocked
+);
+
+-- 발급 라이선스. 리습이 이 키를 들고 서버에 물어본다.
+CREATE TABLE IF NOT EXISTS licenses (
+    key        TEXT PRIMARY KEY,
+    email      TEXT NOT NULL,
+    kind       TEXT NOT NULL DEFAULT 'demo',   -- demo | full
+    issued     REAL NOT NULL,
+    first_use  REAL,                  -- 처음 쓴 시각. 데모 만료는 여기서부터 센다
+    expires    REAL,                  -- 정품은 비움(무기한)
+    machine    TEXT,                  -- 처음 쓴 PC 지문. 이후 다른 PC는 거부
+    machine_at REAL,
+    last_use   REAL,
+    uses       INTEGER NOT NULL DEFAULT 0,
+    revoked    INTEGER NOT NULL DEFAULT 0,
+    note       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_lic_email ON licenses(email);
 """
 
 

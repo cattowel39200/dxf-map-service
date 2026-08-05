@@ -31,6 +31,20 @@ USAGE_DB = Path(os.getenv("USAGE_DB", ROOT / "data" / "usage.db"))
 # 관리자 대시보드(/admin) 접근 암호. 비워 두면 대시보드가 열리지 않는다.
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 
+# 메일 발송. 지메일은 앱 비밀번호를 써야 한다(계정 비밀번호로는 거부된다).
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "지적도 DXF 추출")
+
+# 정품 안내에 표시할 입금 계좌
+BANK_INFO = os.getenv("BANK_INFO", "")
+# 데모 사용 기간(일). 첫 사용 시점부터 센다.
+DEMO_DAYS = int(os.getenv("DEMO_DAYS", "3"))
+
+SITE_URL = os.getenv("SITE_URL", "https://ks-down-map.com")
+
 # 워커가 하나이고 작업 상태를 메모리에 두므로 동시 처리량을 제한한다.
 MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "3"))
 

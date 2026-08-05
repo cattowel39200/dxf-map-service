@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, crs, jobs, notices, usage
+from . import config, crs, jobs, licensing, mailer, notices, usage
 from .geom import BBox
 from .sources import vworld
 
@@ -359,6 +359,91 @@ def _require_admin(request: Request):
 async def usage_stats(request: Request, days: int = 30):
     _require_admin(request)
     return usage.stats(max(7, min(days, 90)))
+
+
+# ── 사용 신청 ─────────────────────────────────────────────
+@app.post("/api/apply")
+async def apply(request: Request):
+    """소개 페이지에서 이메일을 남기면 여기로 들어온다."""
+    b = await request.json()
+    email = (b.get("email") or "").strip()
+    if not licensing.valid_email(email):
+        raise HTTPException(400, "이메일 주소를 다시 확인해 주세요.")
+    a = licensing.apply(
+        email=email, name=(b.get("name") or "")[:60],
+        company=(b.get("company") or "")[:80], memo=(b.get("memo") or "")[:300],
+        ip=_client_ip(request))
+    return {"ok": True, "already": a.get("already", False)}
+
+
+# ── 라이선스 검증 (리습이 부른다) ─────────────────────────
+@app.post("/api/license/check")
+async def license_check(request: Request):
+    b = await request.json()
+    return licensing.check((b.get("key") or ""), (b.get("machine") or "")[:120])
+
+
+# ── 관리자: 신청자와 라이선스 ─────────────────────────────
+@app.get("/api/admin/applicants")
+async def admin_applicants(request: Request):
+    _require_admin(request)
+    return {"applicants": licensing.list_applicants(),
+            "mail_ready": mailer.configured(),
+            "bank": config.BANK_INFO, "demo_days": config.DEMO_DAYS}
+
+
+@app.post("/api/admin/send")
+async def admin_send(request: Request):
+    """신청자에게 발급키와 사용법을 메일로 보낸다. kind: demo | full"""
+    _require_admin(request)
+    b = await request.json()
+    email = (b.get("email") or "").strip().lower()
+    kind = "full" if b.get("kind") == "full" else "demo"
+    if not licensing.valid_email(email):
+        raise HTTPException(400, "이메일 주소가 올바르지 않습니다.")
+    if not mailer.configured():
+        raise HTTPException(503, "메일 계정이 설정되지 않았습니다.")
+
+    lic = licensing.issue(email, kind=kind, note=b.get("note") or "")
+    name = (b.get("name") or "").strip()
+    subject, body = (mailer.full_body(lic["key"], name) if kind == "full"
+                     else mailer.demo_body(lic["key"], name))
+
+    # 배포 파일이 있으면 첨부한다. 없으면 본문만 보낸다.
+    attach = []
+    pkg = WEB / "download" / "CADMAP-setup.zip"
+    if pkg.exists():
+        attach.append((pkg.name, pkg.read_bytes(), "application/zip"))
+
+    try:
+        await asyncio.to_thread(mailer.send, email, subject, body, attach)
+    except mailer.MailError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return {"ok": True, "key": lic["key"], "kind": kind,
+            "attached": bool(attach)}
+
+
+@app.post("/api/admin/license/{key}/{action}")
+async def admin_license(key: str, action: str, request: Request):
+    _require_admin(request)
+    fn = {"upgrade": licensing.upgrade,
+          "revoke": lambda k: licensing.revoke(k, True),
+          "unrevoke": lambda k: licensing.revoke(k, False),
+          "reset-machine": licensing.reset_machine}.get(action)
+    if not fn:
+        raise HTTPException(400, "알 수 없는 동작입니다.")
+    out = fn(key)
+    if not out:
+        raise HTTPException(404, "발급키를 찾을 수 없습니다.")
+    return out
+
+
+@app.delete("/api/admin/applicants/{aid}")
+async def admin_applicant_delete(aid: int, request: Request):
+    _require_admin(request)
+    if not licensing.delete_applicant(aid):
+        raise HTTPException(404, "신청자를 찾을 수 없습니다.")
+    return {"ok": True}
 
 
 # ── 공지사항 ──────────────────────────────────────────────
