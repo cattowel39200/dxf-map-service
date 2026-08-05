@@ -25,6 +25,12 @@ MAX_AREA_KM2 = float(os.getenv("MAX_AREA_KM2", "1.0"))
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", ROOT / "output"))
 OUTPUT_TTL_HOURS = float(os.getenv("OUTPUT_TTL_HOURS", "24"))
 
+# 사용 기록 데이터베이스. 산출물과 달리 오래 남긴다.
+USAGE_DB = Path(os.getenv("USAGE_DB", ROOT / "data" / "usage.db"))
+
+# 관리자 대시보드(/admin) 접근 암호. 비워 두면 대시보드가 열리지 않는다.
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+
 # 워커가 하나이고 작업 상태를 메모리에 두므로 동시 처리량을 제한한다.
 MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "3"))
 

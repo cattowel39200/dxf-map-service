@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, crs, jobs
+from . import config, crs, jobs, usage
 from .geom import BBox
 from .sources import vworld
 
@@ -296,6 +296,9 @@ async def create_job(req: Request):
             "crs": target,
             "layers": layers,
             "options": body.get("options", {}),
+            "ip": _client_ip(req),
+            # 리습만 bbox_crs 를 보낸다. 웹 화면과 CAD를 이걸로 가른다.
+            "source": "cad" if bbox_crs != "4326" else "web",
         })
     except jobs.Busy as exc:
         raise HTTPException(429, str(exc)) from exc
@@ -311,11 +314,42 @@ async def job_status(job_id: str):
 
 
 @app.get("/api/jobs/{job_id}/download")
-async def job_download(job_id: str):
+async def job_download(job_id: str, request: Request):
     job = jobs.get(job_id)
     if not job or job.state != "done" or not job.path or not job.path.exists():
         raise HTTPException(404, "다운로드할 파일이 없습니다.")
+    usage.record_download(job_id, _client_ip(request))
     return FileResponse(job.path, media_type="image/vnd.dxf", filename=job.filename)
+
+
+def _client_ip(request: Request) -> str | None:
+    """Cloudflare 뒤에 있으므로 원래 접속자 IP는 헤더로 온다."""
+    for h in ("cf-connecting-ip", "x-forwarded-for", "x-real-ip"):
+        v = request.headers.get(h)
+        if v:
+            return v.split(",")[0].strip()[:45]
+    return request.client.host if request.client else None
+
+
+def _require_admin(request: Request):
+    if not config.ADMIN_TOKEN:
+        raise HTTPException(
+            503, "관리자 암호가 설정되지 않았습니다. .env 에 ADMIN_TOKEN 을 넣으세요.")
+    given = (request.headers.get("x-admin-token")
+             or request.query_params.get("token") or "")
+    if given != config.ADMIN_TOKEN:
+        raise HTTPException(401, "관리자 암호가 올바르지 않습니다.")
+
+
+@app.get("/api/usage")
+async def usage_stats(request: Request, days: int = 30):
+    _require_admin(request)
+    return usage.stats(max(7, min(days, 90)))
+
+
+@app.get("/admin")
+async def admin_page():
+    return FileResponse(WEB / "admin.html")
 
 
 def _parse_bbox(raw: str) -> BBox:

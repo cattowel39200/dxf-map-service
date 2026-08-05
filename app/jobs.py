@@ -10,7 +10,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config
+from . import config, usage
 from .dxfgen import DxfBuilder
 from .geom import BBox
 from .sources import vworld
@@ -124,6 +124,7 @@ async def _run(job: Job, req: dict):
         job.error = str(exc) or exc.__class__.__name__
     finally:
         job.elapsed = time.time() - started
+        _log_usage(job, req)
 
 
 def _assemble(job_id, box, target, options, layers, parcels):
@@ -139,6 +140,23 @@ def _assemble(job_id, box, target, options, layers, parcels):
     path = config.OUTPUT_DIR / f"{job_id}_{name}"
     b.save(path)
     return path, name, path.stat().st_size, b.stats()
+
+
+def _log_usage(job: Job, req: dict):
+    """기록 실패가 추출 결과에 영향을 주지 않게 감싼다."""
+    try:
+        box = BBox(*req["bbox"])
+        lon, lat = box.center
+        usage.record(job, {
+            "ip": req.get("ip"),
+            "source": req.get("source"),
+            "crs": req.get("crs"),
+            "layers": req.get("layers"),
+            "area_km2": round(box.area_km2(), 5),
+            "lon": round(lon, 5), "lat": round(lat, 5),
+        })
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _filename(box: BBox, target):
