@@ -15,9 +15,10 @@ services:
       # 값은 Render 대시보드에서 직접 넣는다. 저장소에 두지 않는다.
       - key: VWORLD_KEY
         sync: false
-      # 인증키에 등록한 도메인과 같아야 한다. 배포 후 실제 주소로 바꾼다.
+      # V-World 인증키에 등록한 도메인. 앞에서부터 시도하고 거부되면 다음으로
+      # 넘어가므로, 커스텀 도메인을 붙이기 전에도 배포판이 동작한다.
       - key: VWORLD_DOMAIN
-        value: dxf-map-service.onrender.com
+        value: ks-down-map.com,localhost
       - key: MAX_AREA_KM2
         value: "1.0"
       - key: MAX_CONCURRENT_JOBS
