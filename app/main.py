@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, crs, jobs, licensing, mailer, notices, usage
+from . import config, crs, jobs, licensing, mailer, notices, purchases, usage
 from .geom import BBox
 from .sources import vworld
 
@@ -62,6 +62,7 @@ async def get_config():
                      if config.TILE_DIRECT and config.VWORLD_KEY else None),
         "tile_layers": TILE_LAYERS,
         "bank": config.BANK_INFO,
+        "price": config.PRICE,
         "demo_days": config.DEMO_DAYS,
         "has_package": (WEB / "download" / "CADMAP-setup.zip").exists(),
         "youtube": config.YOUTUBE_ID,
@@ -387,13 +388,57 @@ async def license_check(request: Request):
     return licensing.check((b.get("key") or ""), (b.get("machine") or "")[:120])
 
 
+# ── 정품 구매 신청 (리습이 부른다) ────────────────────────
+@app.get("/api/purchase")
+async def purchase_get(key: str = ""):
+    """리습이 정품신청 창을 열 때 부른다. 이미 신청했는지 알려 준다."""
+    return purchases.get(key)
+
+
+@app.post("/api/purchase")
+async def purchase_post(request: Request):
+    """정품 구매를 신청한다. 세금계산서를 원하면 사업자 정보도 함께 받는다."""
+    b = await request.json()
+    out = purchases.request(
+        key=(b.get("key") or ""),
+        machine=(b.get("machine") or ""),
+        biz={f: b.get(f) for f in purchases.FIELDS},
+        want_invoice=bool(b.get("want_invoice")),
+    )
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("reason", "신청하지 못했습니다."))
+    return out
+
+
 # ── 관리자: 신청자와 라이선스 ─────────────────────────────
 @app.get("/api/admin/applicants")
 async def admin_applicants(request: Request):
     _require_admin(request)
-    return {"applicants": licensing.list_applicants(),
+    apps = licensing.list_applicants()
+    # 발급키마다 구매 신청 상태를 붙여 준다. 화면에서 한눈에 보이게.
+    keys = [l["key"] for a in apps for l in (a.get("licenses") or [])]
+    pur = purchases.by_keys(keys)
+    for a in apps:
+        for l in a.get("licenses") or []:
+            if l["key"] in pur:
+                l["purchase"] = pur[l["key"]]
+    return {"applicants": apps,
             "mail_ready": mailer.configured(),
-            "bank": config.BANK_INFO, "demo_days": config.DEMO_DAYS}
+            "bank": config.BANK_INFO, "demo_days": config.DEMO_DAYS,
+            "price": config.PRICE,
+            "pending_purchases": purchases.pending_count()}
+
+
+@app.post("/api/admin/purchase/{key}/{action}")
+async def admin_purchase(key: str, action: str, request: Request):
+    """세금계산서 발급 표시. invoiced | uninvoiced"""
+    _require_admin(request)
+    if action not in ("invoiced", "uninvoiced"):
+        raise HTTPException(400, "알 수 없는 동작입니다.")
+    out = purchases.mark_invoiced(key.upper(), action == "invoiced")
+    if not out.get("ok"):
+        raise HTTPException(404, out.get("reason", "찾을 수 없습니다."))
+    return out
 
 
 @app.post("/api/admin/send")
@@ -423,6 +468,8 @@ async def admin_send(request: Request):
         await asyncio.to_thread(mailer.send, email, subject, body, attach)
     except mailer.MailError as exc:
         raise HTTPException(502, str(exc)) from exc
+    if kind == "full":
+        purchases.close(lic["key"])   # 정품을 보냈으니 '신청중'을 내린다
     return {"ok": True, "key": lic["key"], "kind": kind,
             "attached": bool(attach)}
 
@@ -439,6 +486,8 @@ async def admin_license(key: str, action: str, request: Request):
     out = fn(key)
     if not out:
         raise HTTPException(404, "발급키를 찾을 수 없습니다.")
+    if action == "upgrade":
+        purchases.close(key)      # 정품이 되었으니 '신청중' 표시를 내린다
     return out
 
 

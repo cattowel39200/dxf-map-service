@@ -60,6 +60,23 @@ body{overflow:auto}
 .sbtn.full:hover:not(:disabled){background:var(--accent);color:#fff}
 .sbtn:disabled{opacity:.45;cursor:not-allowed}
 .sbtn.danger:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-soft)}
+/* 정품 구매 신청 */
+.purbox{margin-top:7px;padding:9px 11px;border-radius:7px;
+  border:1px solid var(--line);background:var(--bg-2)}
+.purbox.on{border-color:color-mix(in srgb,var(--danger) 45%,transparent);
+  background:var(--danger-soft)}
+.purhead{font-size:11.5px;font-weight:700;color:var(--danger);
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.purhead.done{color:var(--text-3);font-weight:600}
+.purpc{font-family:var(--mono);font-size:10.5px;font-weight:600;
+  color:var(--danger);opacity:.85}
+.purmeta{font-size:10.5px;color:var(--text-3);margin-top:2px}
+.purnote{font-size:10.5px;color:var(--text-3);margin-top:6px}
+.biztbl{margin-top:7px;border-collapse:collapse;width:100%}
+.biztbl th{text-align:left;width:96px;padding:2px 0;font-size:10.5px;
+  font-weight:600;color:var(--text-3);white-space:nowrap;vertical-align:top}
+.biztbl td{padding:2px 0;font-size:11px;color:var(--text-2);word-break:break-all}
+
 .licrow{display:flex;flex-direction:column;gap:6px}
 .licline{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .mailwarn{margin:0 0 12px;padding:10px 12px;border-radius:7px;font-size:12px;
@@ -328,7 +345,42 @@ function licBlock(l) {
   return `<div>
     <div class="licline"><span class="lickey">${l.key}</span>${badges}</div>
     <div class="licmeta">${l.machine ? 'PC 등록됨' : 'PC 미등록'} · 사용 ${l.uses}회 · ${until}${trTxt}</div>
+    ${purBlock(l)}
     <div class="licline" style="margin-top:3px">${acts}</div>
+  </div>`;
+}
+
+// 정품 구매 신청. 입금자명이 곧 PC 번호라 그것으로 대조한다.
+function purBlock(l) {
+  const p = l.purchase;
+  if (!p) return '';
+
+  const head = p.status === 'pending'
+    ? `<div class="purhead">정품신청중<span class="purpc">입금자명 ${esc(p.machine || '—')}</span></div>`
+    : '<div class="purhead done">정품 처리 완료</div>';
+
+  const rows = [];
+  if (p.want_invoice) {
+    rows.push(['사업자등록번호', p.biz_no], ['상호', p.biz_name],
+              ['주소', p.biz_addr], ['업종', p.biz_type]);
+  }
+  const biz = rows.length
+    ? `<table class="biztbl">${rows.map(([k, v]) =>
+        `<tr><th>${k}</th><td>${esc(v || '—')}</td></tr>`).join('')}</table>`
+    : '<div class="purnote">세금계산서를 요청하지 않았습니다.</div>';
+
+  const inv = p.want_invoice
+    ? (p.invoiced
+        ? `<span class="pill ok">발급완료</span>
+           <button class="sbtn" data-pur="uninvoiced" data-key="${l.key}">발급 취소</button>`
+        : `<button class="sbtn full" data-pur="invoiced" data-key="${l.key}">세금계산서 발급완료</button>`)
+    : '';
+
+  return `<div class="purbox${p.status === 'pending' ? ' on' : ''}">
+    ${head}
+    <div class="purmeta">${(p.amount || 0).toLocaleString('ko-KR')}원 (부가세 포함)</div>
+    ${biz}
+    ${inv ? `<div class="licline" style="margin-top:8px">${inv}</div>` : ''}
   </div>`;
 }
 
@@ -336,8 +388,9 @@ async function loadApplicants() {
   let d;
   try { d = await api('/api/admin/applicants'); } catch { return; }
   const list = d.applicants || [];
-  $('appCnt').textContent = `${list.length}명 · 데모 ${list.filter(a => a.status === 'demo').length}` +
-    ` · 정품 ${list.filter(a => a.status === 'paid').length}`;
+  $('appCnt').innerHTML = `${list.length}명 · 데모 ${list.filter(a => a.status === 'demo').length}` +
+    ` · 정품 ${list.filter(a => a.status === 'paid').length}` +
+    (d.pending_purchases ? ` · <b style="color:var(--danger)">정품신청중 ${d.pending_purchases}</b>` : '');
   $('mailWarn').classList.toggle('on', !d.mail_ready);
 
   if (!list.length) {
@@ -399,6 +452,17 @@ async function loadApplicants() {
     if (!confirm(b.dataset.key + ' 를 ' + ko + '할까요?')) return;
     try {
       await api('/api/admin/license/' + b.dataset.key + '/' + act, { method: 'POST' });
+      loadApplicants();
+    } catch (e) { alert(e.message); }
+  });
+
+  $('tApp').querySelectorAll('[data-pur]').forEach(b => b.onclick = async () => {
+    const on = b.dataset.pur === 'invoiced';
+    if (!confirm(on ? '세금계산서를 발급한 것으로 표시할까요?'
+                    : '발급완료 표시를 지울까요?')) return;
+    try {
+      await api('/api/admin/purchase/' + b.dataset.key + '/' + b.dataset.pur,
+                { method: 'POST' });
       loadApplicants();
     } catch (e) { alert(e.message); }
   });

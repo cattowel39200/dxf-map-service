@@ -254,8 +254,8 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
     </div>
     <div class="plan full">
       <div class="plan-name">정품</div>
-      <div class="plan-price">입금 후 등록</div>
-      <div class="plan-sub">기간 제한 없음</div>
+      <div class="plan-price" id="planPrice">44,000원</div>
+      <div class="plan-sub">부가세 포함 · 기간 제한 없음</div>
       <ul>
         <li>사용 기간 무기한</li>
         <li>PC 1대에서 사용</li>
@@ -371,6 +371,7 @@ const $ = id => document.getElementById(id);
   try { cfg = await (await fetch('/api/config')).json(); } catch {}
 
   if (cfg.bank) $('bankInfo').textContent = cfg.bank;
+  if (cfg.price) $('planPrice').textContent = cfg.price.toLocaleString('ko-KR') + '원';
   else $('bankBox').style.display = 'none';
   if (cfg.demo_days) $('demoDays').textContent = cfg.demo_days;
 

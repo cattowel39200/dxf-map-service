@@ -83,6 +83,26 @@ CREATE TABLE IF NOT EXISTS licenses (
 );
 CREATE INDEX IF NOT EXISTS idx_lic_email ON licenses(email);
 
+-- 정품 구매 신청. 리습의 '정품신청' 창에서 보낸 것이 여기 쌓인다.
+-- 발급키 하나에 신청 하나. 다시 신청하면 덮어쓴다.
+CREATE TABLE IF NOT EXISTS purchases (
+    key          TEXT PRIMARY KEY,
+    email        TEXT,
+    machine      TEXT,                 -- 입금자명으로 쓰는 PC 번호
+    biz_no       TEXT,                 -- 사업자등록번호
+    biz_name     TEXT,                 -- 상호
+    biz_addr     TEXT,                 -- 주소
+    biz_type     TEXT,                 -- 업종
+    want_invoice INTEGER NOT NULL DEFAULT 0,   -- 세금계산서를 원하는지
+    invoiced     INTEGER NOT NULL DEFAULT 0,   -- 발급을 마쳤는지
+    invoiced_at  REAL,
+    amount       INTEGER NOT NULL DEFAULT 44000,
+    status       TEXT NOT NULL DEFAULT 'pending',  -- pending | done | cancel
+    created      REAL NOT NULL,
+    updated      REAL
+);
+CREATE INDEX IF NOT EXISTS idx_pur_status ON purchases(status, created);
+
 -- PC 이전 이력. 자가 이전이 잦으면 여기서 드러난다.
 CREATE TABLE IF NOT EXISTS transfers (
     key      TEXT NOT NULL,

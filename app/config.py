@@ -39,7 +39,9 @@ SMTP_PASS = os.getenv("SMTP_PASS", "")
 MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "지적도 DXF 추출")
 
 # 정품 안내에 표시할 입금 계좌
-BANK_INFO = os.getenv("BANK_INFO", "")
+BANK_INFO = os.getenv("BANK_INFO", "농협 301-0019-9326-91 (예금주 안세종)")
+# 정품 가격(원). 부가세가 포함된 금액이다.
+PRICE = int(os.getenv("PRICE", "44000"))
 # 데모 사용 기간(일). 첫 사용 시점부터 센다.
 DEMO_DAYS = int(os.getenv("DEMO_DAYS", "3"))
 
