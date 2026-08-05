@@ -102,6 +102,43 @@ def delete_applicant(aid: int) -> bool:
 
 
 # ── 라이선스 ──────────────────────────────────────────────
+AUTO_DOMAIN = "auto.cadmap"        # 자동 발급 키에 붙이는 표시용 주소
+
+
+def auto_demo(machine: str, ip: str | None = None) -> dict:
+    """설치한 PC 에서 처음 실행할 때 스스로 데모 키를 받아 간다.
+
+    메일 주소를 받지 않는다. 받는 절차가 없어야 내려받아 바로 써 볼 수 있고,
+    그래야 정품까지 이어진다.
+
+    PC 지문 하나에 한 번만 내준다. 이미 그 PC 에 묶인 키가 있으면 다 썼든
+    아니든 그 키를 그대로 돌려준다. 새로 내주면 3일마다 지우고 다시 깔아
+    계속 쓸 수 있다.
+    """
+    machine = (machine or "").strip()[:120]
+    if not machine:
+        return {"ok": False, "reason": "PC 번호를 읽지 못했습니다."}
+
+    now = time.time()
+    with db.lock():
+        c = db.connect()
+        r = c.execute("SELECT key FROM licenses WHERE machine=?"
+                      " ORDER BY issued DESC LIMIT 1", (machine,)).fetchone()
+        if r:
+            return {"ok": True, "key": r["key"], "again": True}
+
+        key = _new_key()
+        email = f"{machine.lower()}@{AUTO_DOMAIN}"
+        c.execute("INSERT OR IGNORE INTO applicants (email, name, memo, ip,"
+                  " created, status) VALUES (?,?,?,?,?, 'demo')",
+                  (email, "CAD 자동 발급", f"PC {machine}", ip, now))
+        c.execute("INSERT INTO licenses (key, email, kind, issued, machine,"
+                  " machine_at, note) VALUES (?,?, 'demo', ?, ?, ?, ?)",
+                  (key, email, now, machine, now, "CAD 자동 발급"))
+        c.commit()
+    return {"ok": True, "key": key, "again": False}
+
+
 def has_key(email: str) -> bool:
     """이 메일로 이미 쓸 수 있는 키가 있는지. 있으면 화면에 다시 띄우지 않고
     메일로만 보낸다. 남의 주소를 넣어 키를 훔쳐보는 것을 막으려는 것이다."""

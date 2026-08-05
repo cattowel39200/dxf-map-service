@@ -33,7 +33,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.1.2")
+(setq *cm:version* "1.2.0")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -460,6 +460,7 @@
         *cm:tcol*   (cm:regget "TCol"   *cm:tcol*)
         *cm:tstyle* (cm:regget "TStyle" *cm:tstyle*))
   (setq *cm:tsize* (cm:posnum (cm:regget "TSize" "") *cm:tsize*))
+  (setq *cm:ct* (cm:regget "Contact" ""))
   ;; 삽입한 것을 후처리해야 하므로 분해는 늘 한다.
   (setq *cm:explode* T)
   T)
@@ -514,6 +515,25 @@
   (cm:regput "Key" *cm:key*)
   *cm:key*)
 
+;; 발급키가 없으면 이 PC 앞으로 데모 키를 스스로 받아 온다.
+;; 메일 주소를 묻지 않는다. 내려받아 바로 써 볼 수 있어야 하기 때문이다.
+;; PC 지문 하나에 한 번만 나오므로, 지우고 다시 깔아도 같은 키가 온다.
+(defun cm:autokey ( / body res txt k)
+  (cm:msg "이 PC 앞으로 데모 발급키를 받는 중...")
+  (setq body (strcat "{\"machine\":\"" (cm:machine) "\"}"))
+  (setq res (cm:http "POST" (strcat *cm:server* "/api/license/auto") body)
+        txt (cadr res))
+  (cond
+    ((and txt (setq k (cm:jstr txt "key")))
+     (cm:setkey k)
+     (cm:msg (strcat "발급키 " k " 를 받았습니다."))
+     (if (not (vl-string-search "\"again\":true" txt))
+       (cm:msg "   처음 쓰신 때부터 3일간 써 보실 수 있습니다."))
+     k)
+    (T
+     (cm:msg "발급키를 받지 못했습니다. 인터넷 연결을 확인해 주세요.")
+     nil)))
+
 (defun cm:licnote (txt / kind days)
   (setq kind (cm:n (cm:jstr txt "kind") "")
         days (cm:jnum txt "days_left"))
@@ -525,8 +545,10 @@
 ;; 서버에 발급키를 물어본다.  (T . 안내문) 또는 (nil . 사유) 를 돌려준다.
 ;; 확인은 서버에서만 하므로 파일을 복사해도 다른 PC 에서는 열리지 않는다.
 (defun cm:license ( / body res txt)
+  ;; 키가 없으면 먼저 받아 온다. 사용자가 할 일이 없다.
+  (if (= (cm:n *cm:key* "") "") (cm:autokey))
   (if (= (cm:n *cm:key* "") "")
-    (cons nil "발급키가 없습니다.  발급키 명령으로 등록해 주세요.")
+    (cons nil "발급키를 받지 못했습니다. 인터넷 연결을 확인해 주세요.")
     (progn
       (setq body (strcat "{\"key\":\"" *cm:key* "\","
                          "\"machine\":\"" (cm:machine) "\"}"))
@@ -545,9 +567,12 @@
   (cm:msg "===== 발급키 =====")
   (cm:msg (strcat "  등록된 키 : " (if (= cur "") "없음" cur)))
   (cm:msg (strcat "  이 PC 번호 : " (cm:machine)))
-  (cm:msg (strcat "  신청하기   : " *cm:server* "/cad"))
-  (setq k (getstring T "\n발급키 (KS-XXXX-XXXX-XXXX, 그냥 엔터면 그대로): "))
-  (if (/= k "") (cm:setkey k))
+  (if (= cur "")
+    (cm:msg "  키가 없으면 그냥 엔터를 치십시오. 자동으로 받아 드립니다."))
+  (setq k (getstring T "\n발급키 (KS-XXXX-XXXX-XXXX, 그냥 엔터면 자동): "))
+  (if (/= k "")
+    (cm:setkey k)
+    (if (= cur "") (cm:autokey)))
   (if (= (cm:n *cm:key* "") "")
     (cm:msg "등록된 발급키가 없습니다.")
     (progn
@@ -654,6 +679,12 @@
       "■ 한 번에 받을 수 있는 넓이"
       "   1회 1 km2 까지입니다. 넓은 곳은 나눠서 받으십시오."
       ""
+      "■ 발급키는 따로 받지 않으셔도 됩니다"
+      "   설치하고 [지적도삽입] 을 처음 누르시면, 이 PC 앞으로"
+      "   3일짜리 데모 발급키가 저절로 만들어집니다."
+      "   메일 주소를 적거나 기다리실 필요가 없습니다."
+      "   받으신 키는 [정보] 창에서 확인하실 수 있습니다."
+      ""
       "■ 정품 신청 방법"
       "   1. 메뉴 [지적도] - [정품신청] 을 누릅니다."
       "   2. 창에 적힌 계좌로 입금하십시오."
@@ -661,10 +692,12 @@
       "   3. 입금하실 때 [보내는 분] 이름 자리에 창에 표시된"
       "      PC 번호를 그대로 넣어 주십시오."
       "      이름으로 넣으시면 누구의 입금인지 확인이 늦어집니다."
-      "   4. 세금계산서가 필요하시면 [사업자 정보 적기] 를 눌러"
+      "   4. 연락처(이메일 또는 전화)를 꼭 적어 주십시오."
+      "      입금 확인과 세금계산서 발송에 씁니다."
+      "   5. 세금계산서가 필요하시면 [사업자 정보 적기] 를 눌러"
       "      신청자 이름·사업자등록번호·상호·주소·업종을 적어 주십시오."
-      "   5. [정품 신청하기] 를 누르면 접수됩니다."
-      "   6. 입금이 확인되면 정품으로 바뀝니다. 다시 설치하실 필요 없습니다."
+      "   6. [정품 신청하기] 를 누르면 접수됩니다."
+      "   7. 입금이 확인되면 정품으로 바뀝니다. 다시 설치하실 필요 없습니다."
       ""
       "■ 주의하실 점"
       "   · 발급키는 PC 한 대에서만 쓸 수 있습니다."
@@ -672,6 +705,7 @@
       "   · PC 를 바꾸시거나 윈도우를 다시 까셨다면 30일 뒤"
       "     스스로 옮겨집니다. 그전에 옮기시려면 연락 주십시오."
       "   · 데모는 처음 실행한 때부터 3일간 쓰실 수 있습니다."
+      "     지우고 다시 까셔도 같은 PC 면 기간이 늘지 않습니다."
       "   · 인터넷이 연결되어 있어야 합니다."
       "   · 도면 좌표계가 다르면 엉뚱한 곳에 들어갑니다."
       "     좌표계를 먼저 확인하십시오."
@@ -731,6 +765,7 @@
   (if txt
     (progn
       (if (cm:jstr txt "req_name") (setq *cm:rnm*  (cm:jstr txt "req_name")))
+      (if (cm:jstr txt "contact")  (setq *cm:ct*   (cm:jstr txt "contact")))
       (if (cm:jstr txt "biz_no")   (setq *cm:bno*  (cm:jstr txt "biz_no")))
       (if (cm:jstr txt "biz_name") (setq *cm:bnm*  (cm:jstr txt "biz_name")))
       (if (cm:jstr txt "biz_addr") (setq *cm:badr* (cm:jstr txt "biz_addr")))
@@ -744,6 +779,7 @@
             "\"machine\":\"" (cm:machine) "\","
             "\"want_invoice\":" (if *cm:want* "true" "false") ","
             "\"req_name\":\"" (cm:n *cm:rnm*  "") "\","
+            "\"contact\":\""  (cm:n *cm:ct*   "") "\","
             "\"biz_no\":\""   (cm:n *cm:bno*  "") "\","
             "\"biz_name\":\"" (cm:n *cm:bnm*  "") "\","
             "\"biz_addr\":\"" (cm:n *cm:badr* "") "\","
@@ -780,6 +816,11 @@
         "    : edit_box { key = \"pc\"; label = \"PC 번호\"; edit_width = 26; }"
         "  }"
         "  : boxed_column {"
+        "    label = \"연락처\";"
+        "    : edit_box { key = \"ct\"; label = \"이메일 또는 전화\"; edit_width = 30; }"
+        "    : text { label = \"입금 확인과 세금계산서 발송에 씁니다.\"; }"
+        "  }"
+        "  : boxed_column {"
         "    label = \"세금계산서\";"
         "    : toggle { key = \"want\"; label = \"세금계산서를 받겠습니다\"; }"
         "    : text { key = \"biz\"; label = \"\"; width = 46; }"
@@ -796,6 +837,7 @@
       (if (and (>= id 0) (new_dialog "cm_buy" id))
         (progn
           (set_tile "pc" (cm:machine))
+          (set_tile "ct" (cm:n *cm:ct* ""))
           (set_tile "want" (if *cm:want* "1" "0"))
           (set_tile "biz" (cm:bizsummary))
           (set_tile "state"
@@ -805,7 +847,8 @@
           (action_tile "want" "(setq *cm:want* (= $value \"1\"))")
           (action_tile "bizbtn"
             "(if (cm:bizdlg) (progn (setq *cm:want* T) (set_tile \"want\" \"1\") (set_tile \"biz\" (cm:bizsummary))))")
-          (action_tile "accept" "(done_dialog 1)")
+          (action_tile "accept"
+            "(setq *cm:ct* (get_tile \"ct\"))(done_dialog 1)")
           (action_tile "cancel" "(done_dialog 0)")
           (setq res (start_dialog))))
       (if (>= id 0) (unload_dialog id))
@@ -813,6 +856,9 @@
 
       (if (= res 1)
         (progn
+          (cm:regput "Contact" (cm:n *cm:ct* ""))
+          (if (= (cm:n *cm:ct* "") "")
+            (alert "연락처를 적어 주십시오.\n입금 확인과 세금계산서 발송에 씁니다.")
           (if (and *cm:want* (= (cm:n *cm:bno* "") ""))
             (alert "세금계산서를 받으시려면 사업자등록번호가 있어야 합니다.\n[사업자 정보 적기] 를 눌러 적어 주십시오.")
             (progn
@@ -834,7 +880,7 @@
                                  "예금주     안세종\n\n"
                                  "입금하실 때 보내는 분 이름 자리에\n"
                                  "위 PC 번호를 그대로 넣어 주십시오.")))
-                (alert (strcat "신청하지 못했습니다.\n\n" (cdr r))))))))))
+                (alert (strcat "신청하지 못했습니다.\n\n" (cdr r)))))))))))
   (princ))
 
 (defun cm:bizsummary ( / )
@@ -1197,7 +1243,7 @@
 (cm:msg "    좌표          클릭한 점의 좌표를 도면에 기입")
 (cm:msg (strcat "  좌표계  EPSG:" *cm:crs* "   " (cm:crsname *cm:crs*)))
 (cm:msg (strcat "  발급키  " (if (= (cm:n *cm:key* "") "")
-                               "없음 - 발급키 명령으로 등록해 주세요"
+                               "없음 - 지적도삽입 을 누르시면 자동으로 받습니다"
                                *cm:key*)))
 (cm:msg "==========================================================")
 

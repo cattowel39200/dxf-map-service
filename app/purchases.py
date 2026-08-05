@@ -13,7 +13,8 @@ import time
 
 from . import config, db
 
-FIELDS = ("req_name", "biz_no", "biz_name", "biz_addr", "biz_type")
+FIELDS = ("req_name", "contact", "biz_no", "biz_name", "biz_addr",
+          "biz_type")
 
 
 def _row(key: str) -> dict | None:
@@ -58,6 +59,10 @@ def request(key: str, machine: str, biz: dict, want_invoice: bool) -> dict:
         # PC 번호는 리습이 보낸 것을 우선하되, 없으면 라이선스에 묶인 것을 쓴다
         machine = (machine or lic["machine"] or "")[:120]
 
+        if not (biz.get("contact") or "").strip():
+            return {"ok": False,
+                    "reason": "연락처를 적어 주세요. 입금 확인과 세금계산서 발송에 씁니다."}
+
         if want_invoice and not (biz.get("biz_no") or "").strip():
             return {"ok": False,
                     "reason": "세금계산서를 받으시려면 사업자등록번호가 있어야 합니다."}
@@ -67,20 +72,21 @@ def request(key: str, machine: str, biz: dict, want_invoice: bool) -> dict:
                         (key,)).fetchone()
         if old:
             c.execute(
-                "UPDATE purchases SET email=?, machine=?, req_name=?, biz_no=?,"
-                " biz_name=?, biz_addr=?, biz_type=?, want_invoice=?, amount=?,"
-                " status='pending', updated=? WHERE key=?",
-                (email, machine, vals["req_name"], vals["biz_no"],
-                 vals["biz_name"], vals["biz_addr"], vals["biz_type"],
-                 int(want_invoice), config.PRICE, now, key))
+                "UPDATE purchases SET email=?, machine=?, req_name=?, contact=?,"
+                " biz_no=?, biz_name=?, biz_addr=?, biz_type=?, want_invoice=?,"
+                " amount=?, status='pending', updated=? WHERE key=?",
+                (email, machine, vals["req_name"], vals["contact"],
+                 vals["biz_no"], vals["biz_name"], vals["biz_addr"],
+                 vals["biz_type"], int(want_invoice), config.PRICE, now, key))
         else:
             c.execute(
-                "INSERT INTO purchases (key, email, machine, req_name, biz_no,"
-                " biz_name, biz_addr, biz_type, want_invoice, amount, status,"
-                " created, updated) VALUES (?,?,?,?,?,?,?,?,?,?, 'pending', ?, ?)",
-                (key, email, machine, vals["req_name"], vals["biz_no"],
-                 vals["biz_name"], vals["biz_addr"], vals["biz_type"],
-                 int(want_invoice), config.PRICE, now, now))
+                "INSERT INTO purchases (key, email, machine, req_name, contact,"
+                " biz_no, biz_name, biz_addr, biz_type, want_invoice, amount,"
+                " status, created, updated)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pending', ?, ?)",
+                (key, email, machine, vals["req_name"], vals["contact"],
+                 vals["biz_no"], vals["biz_name"], vals["biz_addr"],
+                 vals["biz_type"], int(want_invoice), config.PRICE, now, now))
         c.commit()
 
     return {"ok": True, "machine": machine, "amount": config.PRICE,

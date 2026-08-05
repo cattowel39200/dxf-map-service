@@ -133,6 +133,10 @@ h2.sec .n{font-family:var(--mono);font-size:11px;color:var(--accent-hi);
 .verchips span{font-family:var(--mono);font-size:11px;padding:3px 7px;
   border-radius:5px;background:var(--accent-soft);color:var(--accent-hi);
   border:1px solid var(--accent-line)}
+.dl-free{margin-top:14px;padding:12px 14px;border-radius:8px;font-size:12.5px;
+  line-height:1.65;background:var(--accent-soft);color:var(--accent-hi);
+  border:1px solid var(--accent-line);word-break:keep-all}
+
 .vernote{font-size:11.5px;color:var(--text-3);line-height:1.65;margin:11px 0 0;
   word-break:keep-all}
 .vernote code{font-family:var(--mono);font-size:10.5px}
@@ -208,7 +212,7 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
        <b>지적도</b> 메뉴에서 두 점만 찍으면 그 범위의 연속지적도가 현재 도면에
        그대로 삽입됩니다. 레이어명·색상·글자까지 정하신 대로 정리되어 들어옵니다.</p>
     <div class="cta-row">
-      <a class="btn-primary" href="#apply">
+      <a class="btn-primary" href="#download">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M8 1.8v8.6M4.6 7.2L8 10.6l3.4-3.4" stroke="currentColor"
                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -247,18 +251,18 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
     <div class="step-card">
       <div class="step-no">2</div>
       <div>
-        <h3>발급키 등록</h3>
-        <p><a href="#apply">이메일만 남기면 바로 나오는</a> 데모 발급키를
-           <b>지적도 → 정보 → 발급키 등록</b>에 넣습니다. 설치할 때 미리 넣어
-           두셔도 됩니다.</p>
+        <h3>바로 사용</h3>
+        <p><b>지적도 → 지적도삽입</b>을 누르면 이 PC 앞으로 <b>3일 데모 발급키가
+           저절로 만들어집니다.</b> 신청하거나 메일을 기다리실 필요가 없습니다.
+           좌표계와 레이어·색상·글자를 정하고 두 점을 찍으면 끝입니다.</p>
       </div>
     </div>
     <div class="step-card">
       <div class="step-no">3</div>
       <div>
-        <h3>불러오기</h3>
-        <p><b>지적도 → 지적도삽입</b>에서 좌표계와 레이어·색상·글자를 정하고
-           두 점을 찍으면 끝입니다. 정하신 레이어로 자동 정리되어 들어옵니다.</p>
+        <h3>정품 전환</h3>
+        <p>계속 쓰시겠다면 <b>지적도 → 정품신청</b>에서 입금하시면 됩니다.
+           쓰시던 키가 그대로 정품이 되어 다시 설치하실 필요가 없습니다.</p>
       </div>
     </div>
   </div>
@@ -301,7 +305,7 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
       <ul>
         <li>모든 기능을 그대로</li>
         <li>PC 1대에서 사용</li>
-        <li><b>신청 즉시 화면에 발급</b></li>
+        <li><b>신청 없이 자동 발급</b></li>
       </ul>
     </div>
     <div class="plan full">
@@ -344,6 +348,12 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
       Windows가 배포자를 모르는 프로그램에 띄우는 화면입니다.
       <b>추가 정보 → 실행</b>을 누르면 설치가 진행됩니다.
     </div>
+    <div class="dl-free">
+      <b>발급키를 따로 신청하지 않으셔도 됩니다.</b>
+      설치하고 <b>지적도삽입</b>을 처음 누르시면 이 PC 앞으로
+      3일 데모 발급키가 저절로 만들어집니다. 메일 주소를 적거나
+      승인을 기다리실 필요가 없습니다.
+    </div>
     <p class="dl-help">설치 파일이 AutoCAD를 찾아 자동 실행까지 등록해 드립니다.
       관리자 권한은 필요 없고, 설치 창의 <b>제거</b> 단추로 되돌릴 수 있습니다.
       설치 후 AutoCAD를 다시 켜면 상단에 <b>지적도</b> 메뉴가 생깁니다.</p>
@@ -372,10 +382,11 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
     </div>
   </div>
 
-  <h2 class="sec" id="apply"><span class="n">발급키</span>3일 데모, 바로 드립니다</h2>
+  <h2 class="sec" id="apply"><span class="n">선택</span>미리 받아 두시겠다면</h2>
   <div class="apply">
-    <p class="lead">이메일만 남기시면 <b>기다리실 필요 없이 그 자리에서</b>
-       발급키를 만들어 드립니다. 같은 키가 메일로도 갑니다.</p>
+    <p class="lead"><b>이 칸은 안 쓰셔도 됩니다.</b> 설치하고 실행하면 발급키가
+       저절로 만들어집니다. 다만 키를 메일로 받아 두고 싶으시거나 문의하실
+       내용이 있으면 여기에 남겨 주십시오.</p>
     <div class="frm" id="applyForm">
       <div>
         <label class="req" for="fEmail">이메일</label>
@@ -395,7 +406,7 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
         <label for="fMemo">문의사항 (선택)</label>
         <textarea id="fMemo" rows="2" placeholder="궁금한 점이 있으면 적어 주세요" maxlength="300"></textarea>
       </div>
-      <button class="btn-primary" id="applyBtn" style="justify-content:center">데모 발급키 받기</button>
+      <button class="btn-ghost" id="applyBtn" style="justify-content:center">메일로 받기 · 문의하기</button>
     </div>
 
     <div class="keyout" id="keyOut">
@@ -431,11 +442,14 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
       </div>
     </div>
     <ol class="buysteps">
-      <li>데모를 설치하고 발급키를 등록합니다.</li>
+      <li>설치하고 <b>지적도삽입</b>을 한 번 실행합니다. 발급키가 저절로
+          만들어집니다.</li>
       <li>AutoCAD에서 <b>지적도 → 정품신청</b>을 엽니다.
           창에 <b>PC 번호</b>가 나옵니다.</li>
       <li>위 계좌로 입금하시되, <b>보내는 분 이름 자리에 PC 번호를 그대로</b>
           넣어 주십시오. 이름으로 넣으시면 어느 분 입금인지 확인이 늦어집니다.</li>
+      <li><b>연락처</b>(이메일 또는 전화)를 적어 주십시오. 입금 확인과
+          세금계산서 발송에 씁니다.</li>
       <li>세금계산서가 필요하시면 같은 창에서 <b>사업자 정보 적기</b>를 눌러
           신청자 이름·사업자등록번호·상호·주소·업종을 적어 주십시오.</li>
       <li><b>정품 신청하기</b>를 누르면 접수됩니다.
@@ -467,10 +481,17 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
          이 프로그램은 동작하지 않습니다. LT 2023 이하는 리습 자체가 없습니다.</p>
     </details>
     <details>
-      <summary>발급키는 얼마나 기다려야 받나요?</summary>
-      <p>기다리지 않으셔도 됩니다. 이메일을 남기시면 <b>그 자리에서 바로</b>
-         데모 발급키가 나오고, 같은 키가 메일로도 갑니다. 이미 받으신 적이
-         있는 이메일이면 화면에 다시 띄우지 않고 메일로만 보내 드립니다.</p>
+      <summary>발급키는 어떻게 받나요?</summary>
+      <p><b>따로 받지 않으셔도 됩니다.</b> 설치하고 <b>지적도삽입</b>을 처음
+         누르시면 그 PC 앞으로 3일 데모 발급키가 저절로 만들어집니다.
+         받으신 키는 <b>지적도 → 정보</b> 창에서 확인하실 수 있습니다.</p>
+      <p>키를 메일로 받아 두고 싶으시면 위 <a href="#apply">신청 칸</a>에
+         이메일을 남겨 주셔도 됩니다.</p>
+    </details>
+    <details>
+      <summary>데모를 지우고 다시 깔면 3일이 새로 시작되나요?</summary>
+      <p>아닙니다. 발급키는 PC에 묶이므로 같은 PC에서는 처음 쓰신 날부터
+         3일이 그대로 흘러갑니다. 다시 설치하셔도 같은 키가 나옵니다.</p>
     </details>
     <details>
       <summary>지적도가 실제 측량 성과와 같나요?</summary>
@@ -589,7 +610,7 @@ $('applyBtn').onclick = async () => {
     msg.textContent = e.message;
   } finally {
     $('applyBtn').disabled = false;
-    $('applyBtn').textContent = '데모 발급키 받기';
+    $('applyBtn').textContent = '메일로 받기 · 문의하기';
   }
 };
 

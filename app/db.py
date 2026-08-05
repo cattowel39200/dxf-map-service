@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS purchases (
     biz_addr     TEXT,                 -- 주소
     biz_type     TEXT,                 -- 업종
     req_name     TEXT,                 -- 신청자 이름
+    contact      TEXT,                 -- 연락처(메일 또는 전화)
     want_invoice INTEGER NOT NULL DEFAULT 0,   -- 세금계산서를 원하는지
     invoiced     INTEGER NOT NULL DEFAULT 0,   -- 발급을 마쳤는지
     invoiced_at  REAL,
@@ -120,6 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_tr_key ON transfers(key, at);
 # 여기에 적어 두고 없으면 붙인다. 운영 중인 자료를 지우지 않고 넘어가려는 것이다.
 ADDED_COLUMNS = [
     ("purchases", "req_name", "TEXT"),   # 신청자 이름
+    ("purchases", "contact", "TEXT"),    # 연락처
 ]
 
 

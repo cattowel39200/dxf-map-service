@@ -360,11 +360,12 @@ function purBlock(l) {
     : '<div class="purhead done">정품 처리 완료</div>';
 
   const rows = [];
+  if (p.req_name || p.contact) {
+    rows.push(['신청자', p.req_name], ['연락처', p.contact]);
+  }
   if (p.want_invoice) {
-    rows.push(['신청자', p.req_name], ['사업자등록번호', p.biz_no],
-              ['상호', p.biz_name], ['주소', p.biz_addr], ['업종', p.biz_type]);
-  } else if (p.req_name) {
-    rows.push(['신청자', p.req_name]);
+    rows.push(['사업자등록번호', p.biz_no], ['상호', p.biz_name],
+              ['주소', p.biz_addr], ['업종', p.biz_type]);
   }
   const biz = (rows.length
       ? `<table class="biztbl">${rows.map(([k, v]) =>

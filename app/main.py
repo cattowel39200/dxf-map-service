@@ -415,6 +415,20 @@ async def license_check(request: Request):
     return licensing.check((b.get("key") or ""), (b.get("machine") or "")[:120])
 
 
+@app.post("/api/license/auto")
+async def license_auto(request: Request):
+    """설치한 PC 가 처음 실행할 때 데모 키를 스스로 받아 간다.
+
+    메일 주소를 묻지 않는다. 내려받아 바로 써 볼 수 있어야 정품까지 이어진다.
+    PC 지문 하나에 한 번만 내주므로, 지우고 다시 깔아도 같은 키가 나온다.
+    """
+    b = await request.json()
+    out = licensing.auto_demo((b.get("machine") or ""), ip=_client_ip(request))
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("reason", "발급하지 못했습니다."))
+    return out
+
+
 # ── 정품 구매 신청 (리습이 부른다) ────────────────────────
 @app.get("/api/purchase")
 async def purchase_get(key: str = ""):

@@ -21,7 +21,7 @@ from tkinter import messagebox, ttk
 
 APP_NAME = "지적도 DXF 가져오기"
 COMPANY = "(주)경성엔지니어링"
-VERSION = "1.1.2"
+VERSION = "1.2.0"
 SITE = "https://ks-down-map.com"
 
 LSP_NAME = "CADMAP.lsp"
@@ -270,8 +270,9 @@ class Installer(tk.Tk):
         e = tk.Entry(self, textvariable=self.key, font=("Consolas", 11),
                      relief="solid", bd=1)
         e.pack(fill="x", ipady=5, **pad)
-        tk.Label(self, text=f"메일로 받으신 KS-XXXX-XXXX-XXXX 형태의 키입니다.\n"
-                            f"나중에 AutoCAD 에서 '발급키' 명령으로 넣으셔도 됩니다.",
+        tk.Label(self, text="비워 두시면 AutoCAD 에서 '지적도삽입' 을 처음 누를 때\n"
+                            "이 PC 앞으로 3일 데모 발급키가 저절로 만들어집니다.\n"
+                            "이미 받으신 키가 있으면 여기에 넣어 주십시오.",
                  bg=BG, fg=SUB, justify="left",
                  font=("맑은 고딕", 8)).pack(anchor="w", pady=(5, 0), **pad)
 
@@ -339,8 +340,9 @@ class Installer(tk.Tk):
             "설치 완료",
             "설치를 마쳤습니다.\n\n"
             "AutoCAD 를 다시 켜시면 상단에 '지적도' 메뉴가 생깁니다.\n"
-            "명령창에 '지적도' 라고 쳐서 바로 쓰셔도 됩니다.\n\n"
-            f"발급키 신청  {SITE}/cad")
+            "[지적도삽입] 을 누르시면 발급키가 저절로 만들어져\n"
+            "3일간 바로 써 보실 수 있습니다.\n\n"
+            f"안내  {SITE}/cad")
 
     def on_uninstall(self):
         if not messagebox.askyesno("제거", "설치한 파일과 자동 실행 등록을 지울까요?"):
