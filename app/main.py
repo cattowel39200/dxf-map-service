@@ -5,6 +5,7 @@ V-World 인증키는 프론트엔드로 내보내지 않는다. 배경지도 타
 """
 import asyncio
 import contextlib
+import hashlib
 import os
 from collections import OrderedDict
 from pathlib import Path
@@ -360,9 +361,44 @@ async def usage_stats(request: Request, days: int = 30):
     return usage.stats(max(7, min(days, 90)))
 
 
+def _asset_version() -> str:
+    """정적 파일이 바뀌면 값이 달라지는 짧은 해시.
+
+    Cloudflare와 브라우저가 js/css를 몇 시간씩 붙들고 있어서, 코드를 고쳐도
+    옛 파일이 그대로 나가는 일이 있었다. 주소에 이 값을 붙여 파일이 바뀌면
+    주소도 바뀌게 한다. 덕분에 캐시는 그대로 길게 두고도 갱신이 즉시 반영된다.
+    """
+    h = hashlib.sha1()
+    for name in sorted(("app.js", "style.css", "logo.svg", "index.html", "admin.html")):
+        f = WEB / name
+        if f.exists():
+            st = f.stat()
+            h.update(f"{name}:{st.st_mtime_ns}:{st.st_size}".encode())
+    return h.hexdigest()[:10]
+
+
+def _serve_page(name: str) -> Response:
+    """페이지를 내보내면서 정적 자원 주소에 버전을 붙인다."""
+    v = _asset_version()
+    html = (WEB / name).read_text(encoding="utf-8")
+    for asset in ("app.js", "style.css", "logo.svg"):
+        html = html.replace(f'"{asset}"', f'"{asset}?v={v}"')
+    return Response(
+        content=html,
+        media_type="text/html; charset=utf-8",
+        # 페이지 자체는 캐시하지 않는다. 안에 든 버전이 최신이어야 하기 때문이다.
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
+
+
+@app.get("/")
+async def index_page():
+    return _serve_page("index.html")
+
+
 @app.get("/admin")
 async def admin_page():
-    return FileResponse(WEB / "admin.html")
+    return _serve_page("admin.html")
 
 
 def _parse_bbox(raw: str) -> BBox:
