@@ -35,7 +35,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.4.1")
+(setq *cm:version* "1.4.3")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -1123,12 +1123,15 @@
       pk
       (strcat "HKEY_CURRENT_USER\\" pk))))
 
-(defun cm:dropmenu ( / acad mnu)
+(defun cm:dropmenu ( / mnu m)
+  ;; 막대에서 떼고 나서 지운다. 막대에 붙은 채로는 지워지지 않는다.
   (vl-catch-all-apply
-    '(lambda ()
-       (setq acad (vlax-get-acad-object)
-             mnu  (vla-get-Menus (vla-Item (vla-get-MenuGroups acad) 0)))
-       (vla-Delete (vla-Item mnu "지적도"))))
+    '(lambda ( / )
+       (setq mnu (vla-get-Menus
+                   (vla-Item (vla-get-MenuGroups (vlax-get-acad-object)) 0)))
+       (setq m (vla-Item mnu "지적도"))
+       (vl-catch-all-apply '(lambda () (vla-RemoveMenuFromMenuBar m)))
+       (vl-catch-all-apply '(lambda () (vla-Delete m)))))
   (princ))
 
 (defun C:CMREMOVE ( / p id res pk path gone)
@@ -1337,31 +1340,71 @@
   ;; 그래서 취소에 해당하는 글자 (chr 3) 을 직접 넣는다. 끝의 빈칸은 엔터다.
   (strcat (chr 3) (chr 3) cmd " "))
 
-(defun cm:menu ( / r)
+(defun cm:barhas (name / bar i n hit)
+  (setq bar (vla-get-MenuBar (vlax-get-acad-object))
+        n (vla-get-Count bar) i 0 hit nil)
+  (while (and (not hit) (< i n))
+    (if (= (vla-get-Name (vla-Item bar i)) name) (setq hit T))
+    (setq i (1+ i)))
+  hit)
+
+(defun cm:menu ( / acad mnu m e r)
+  ;; 작업공간이 복원되면 우리 메뉴는 메뉴 막대에서만 빠지고, 메뉴 자체는
+  ;; 그룹에 그대로 남는다. 그래서 무턱대고 새로 만들면 "이미 있다"며
+  ;; 막힌다. 있으면 그대로 쓰고 막대에만 다시 붙인다.
+  (setq *cm:mstep* "메뉴 막대 켜기")
   (setq r (vl-catch-all-apply
-    '(lambda ( / acad mnu m bar)
-       (setq acad (vlax-get-acad-object)
-             mnu  (vla-get-Menus (vla-Item (vla-get-MenuGroups acad) 0)))
-       ;; 이미 있으면 지운다 (다시 불러도 겹치지 않게)
-       (vl-catch-all-apply '(lambda () (vla-Delete (vla-Item mnu "지적도"))))
-       (setq m (vla-Add mnu "지적도"))
-       (vla-AddMenuItem  m 1 "지적도삽입" (cm:mac "DXFMAP"))
-       (vla-AddSeparator m 2)
-       (vla-AddMenuItem  m 3 "도움말"     (cm:mac "CMHELP"))
-       (vla-AddMenuItem  m 4 "정품신청"   (cm:mac "CMBUY"))
-       (vla-AddMenuItem  m 5 "정보"       (cm:mac "CMABOUT"))
-       (vla-AddSeparator m 6)
-       (vla-AddMenuItem  m 7 "프로그램 삭제" (cm:mac "CMREMOVE"))
-       (setq bar (vla-get-MenuBar acad))
-       (vla-InsertInMenuBar m (vla-get-Count bar))
-       (if (= (getvar "MENUBAR") 0) (setvar "MENUBAR" 1))
+    '(lambda ( / )
+       (if (/= (getvar "MENUBAR") 1) (setvar "MENUBAR" 1))
+
+       (setq *cm:mstep* "AutoCAD 개체 얻기")
+       (setq acad (vlax-get-acad-object))
+
+       (setq *cm:mstep* "메뉴 목록 얻기")
+       (setq mnu (vla-get-Menus (vla-Item (vla-get-MenuGroups acad) 0)))
+
+       (setq *cm:mstep* "만들어 둔 메뉴 찾기")
+       (setq e (vl-catch-all-apply '(lambda () (vla-Item mnu "지적도"))))
+
+       (if (vl-catch-all-error-p e)
+         (progn
+           (setq *cm:mstep* "메뉴 새로 만들기")
+           (setq m (vla-Add mnu "지적도"))
+           (setq *cm:mstep* "항목 넣기")
+           (vla-AddMenuItem  m 0 "지적도삽입" (cm:mac "DXFMAP"))
+           (vla-AddSeparator m 1)
+           (vla-AddMenuItem  m 2 "도움말"     (cm:mac "CMHELP"))
+           (vla-AddMenuItem  m 3 "정품신청"   (cm:mac "CMBUY"))
+           (vla-AddMenuItem  m 4 "정보"       (cm:mac "CMABOUT"))
+           (vla-AddSeparator m 5)
+           (vla-AddMenuItem  m 6 "프로그램 삭제" (cm:mac "CMREMOVE")))
+         (setq m e))
+
+       (setq *cm:mstep* "메뉴 막대에 붙이기")
+       (if (not (cm:barhas "지적도"))
+         (vla-InsertInMenuBar m (vla-get-Count (vla-get-MenuBar acad))))
+       (setq *cm:mstep* "마침")
        T)))
+  (setq *cm:merr* (if (vl-catch-all-error-p r)
+                    (vl-catch-all-error-message r) ""))
   (not (vl-catch-all-error-p r)))
 
-(defun C:CMMENU ( / )
-  (if (cm:menu)
-    (cm:msg "지적도 메뉴를 다시 만들었습니다.")
-    (cm:msg "메뉴를 만들지 못했습니다. 명령을 직접 치셔서 쓰실 수 있습니다."))
+(defun C:CMMENU ( / ok)
+  (setq ok (cm:menu))
+  (cm:msg "===== 지적도 메뉴 =====")
+  (if ok
+    (progn
+      (cm:msg "  메뉴를 만들었습니다.")
+      (cm:msg (strcat "  MENUBAR = " (itoa (getvar "MENUBAR"))
+                      "   (1 이어야 상단 메뉴가 보입니다)"))
+      (cm:msg "  그래도 안 보이시면 이 내용을 알려 주십시오."))
+    (progn
+      (cm:msg (strcat "  실패한 곳 : " (cm:n *cm:mstep* "?")))
+      (cm:msg (strcat "  오류 내용 : " (cm:n *cm:merr* "?")))
+      (cm:msg "  이 두 줄을 그대로 알려 주시면 고쳐 드리겠습니다.")))
+  (cm:msg "  메뉴 없이도 명령을 직접 치시면 다 됩니다:")
+  (cm:msg "     지적도삽입  지적도도움말  정품신청  지적도정보")
+  (cm:msg "=======================")
   (princ))
 
 ;; --------------------------------------------------------------- 삽입 후처리
