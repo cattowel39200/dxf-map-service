@@ -96,11 +96,29 @@ def delete_applicant(aid: int) -> bool:
 
 
 # ── 라이선스 ──────────────────────────────────────────────
-def issue(email: str, kind: str = "demo", note: str = "") -> dict:
-    """키를 새로 발급한다. 같은 사람에게 여러 번 발급할 수 있다(재발급)."""
+def issue(email: str, kind: str = "demo", note: str = "",
+          reuse: bool = True) -> dict:
+    """키를 발급한다.
+
+    reuse=True(기본)이고 이미 쓸 수 있는 키가 있으면 그 키를 그대로 쓴다.
+    데모를 쓰던 사람에게 정품을 보낼 때 키가 바뀌면, 안내문("쓰던 키가 그대로
+    정품이 됩니다")과 어긋나고 고객도 어느 키를 써야 할지 헷갈린다.
+    일부러 새 키가 필요하면(키 분실·유출 등) reuse=False 로 부른다.
+    """
     email = email.strip().lower()
     kind = "full" if kind == "full" else "demo"
     now = time.time()
+
+    if reuse:
+        exist = _latest_usable(email)
+        if exist:
+            # 정품 요청이면 등급만 올린다. 키도 PC 등록도 그대로 둔다.
+            if kind == "full" and exist["kind"] != "full":
+                return upgrade(exist["key"])
+            if kind == exist["kind"]:
+                _touch_applicant(email, kind, now)
+                return get_license(exist["key"])
+
     key = _new_key()
     with db.lock():
         c = db.connect()
@@ -114,6 +132,24 @@ def issue(email: str, kind: str = "demo", note: str = "") -> dict:
                   ("paid" if kind == "full" else "demo", kind, now, kind, now, email))
         c.commit()
     return get_license(key)
+
+
+def _latest_usable(email: str) -> dict | None:
+    """중지되지 않은 가장 최근 키. 없으면 None."""
+    with db.lock():
+        r = db.connect().execute(
+            "SELECT * FROM licenses WHERE email=? AND revoked=0"
+            " ORDER BY (kind='full') DESC, issued DESC LIMIT 1", (email,)).fetchone()
+    return dict(r) if r else None
+
+
+def _touch_applicant(email: str, kind: str, now: float) -> None:
+    col = "sent_full" if kind == "full" else "sent_demo"
+    with db.lock():
+        c = db.connect()
+        c.execute(f"UPDATE applicants SET status=?, {col}=? WHERE email=?",
+                  ("paid" if kind == "full" else "demo", now, email))
+        c.commit()
 
 
 def upgrade(key: str) -> dict | None:
