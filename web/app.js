@@ -460,6 +460,113 @@ $('favClose').onclick = () => {
 
 favRender();
 
+/* ── 지도 우클릭 메뉴 ──────────────────────────────
+   클릭한 지점의 주소를 보거나, 그 지점을 즐겨찾기에 담는다.
+   주소는 V-World 지오코더를 서버가 대신 불러 준다. */
+let ctxPoint = null;          // {lon, lat, px, py}
+
+function ctxClose() {
+  $('ctxMenu').classList.remove('on');
+}
+function addrClose() {
+  $('addrPop').classList.remove('on');
+}
+
+map.getViewport().addEventListener('contextmenu', e => {
+  e.preventDefault();
+  // 지도가 아직 그려지지 않았으면 좌표를 얻을 수 없다. 조용히 넘긴다.
+  const coord = map.getEventCoordinate(e);
+  if (!coord) return;
+  const rect = map.getViewport().getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const [lon, lat] = ol.proj.toLonLat(coord);
+  ctxPoint = { lon, lat, px, py };
+
+  $('ctxCoord').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  const m = $('ctxMenu');
+  m.classList.add('on');
+  // 지도 밖으로 삐져나가지 않게 붙인다
+  const mw = m.offsetWidth, mh = m.offsetHeight;
+  m.style.left = Math.min(px, rect.width - mw - 8) + 'px';
+  m.style.top = Math.min(py, rect.height - mh - 8) + 'px';
+  addrClose();
+});
+
+map.getViewport().addEventListener('pointerdown', ctxClose);
+map.on('movestart', () => { ctxClose(); addrClose(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { ctxClose(); addrClose(); $('favPanel').classList.remove('on'); }
+});
+
+async function fetchAddress(lon, lat) {
+  const r = await fetch(`/api/address?lon=${lon}&lat=${lat}`);
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.detail || `주소를 가져오지 못했습니다 (HTTP ${r.status})`);
+  }
+  return r.json();
+}
+
+/* 주소 보기 */
+$('ctxAddr').onclick = async () => {
+  if (!ctxPoint) return;
+  const { lon, lat, px, py } = ctxPoint;
+  ctxClose();
+  const pop = $('addrPop');
+  pop.style.left = px + 'px';
+  pop.style.top = (py - 12) + 'px';
+  $('addrBody').innerHTML = '<div class="addr-load">주소를 찾는 중…</div>';
+  pop.classList.add('on');
+  try {
+    const d = await fetchAddress(lon, lat);
+    const rows = [
+      ['지번주소', d.parcel],
+      ['도로명주소', d.road],
+    ].map(([k, v]) => `<div class="addr-row"><div class="addr-k">${k}</div>
+      <div class="addr-v${v ? '' : ' none'}">${v ? v.replace(/</g, '&lt;') : '이 지점에는 없습니다'}</div></div>`).join('');
+    $('addrBody').innerHTML = rows +
+      `<button class="addr-copy" id="addrCopyBtn">주소 복사</button>`;
+    $('addrCopyBtn').onclick = () => {
+      const txt = d.parcel || d.road || `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+      navigator.clipboard?.writeText(txt);
+      $('addrCopyBtn').textContent = '복사했습니다';
+      setTimeout(() => { const b = $('addrCopyBtn'); if (b) b.textContent = '주소 복사'; }, 1200);
+    };
+  } catch (e) {
+    $('addrBody').innerHTML = `<div class="addr-row"><div class="addr-v none">${e.message}</div></div>`;
+  }
+};
+
+/* 이 지점 즐겨찾기 추가 — 이름은 주소로 채워 준다 */
+$('ctxFav').onclick = async () => {
+  if (!ctxPoint) return;
+  const { lon, lat } = ctxPoint;
+  ctxClose();
+  let guess = '';
+  try {
+    const d = await fetchAddress(lon, lat);
+    guess = d.parcel || d.road || '';
+  } catch { /* 주소를 못 받아도 좌표로 저장할 수 있게 계속 진행 */ }
+  if (!guess) guess = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+  const name = prompt('즐겨찾기 이름 (지번)', guess);
+  if (name === null) return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const list = favLoad();
+  list.unshift({ name: trimmed, lon, lat, zoom: map.getView().getZoom(), at: Date.now() });
+  favSave(list.slice(0, 100));
+};
+
+/* 좌표 복사 */
+$('ctxCopy').onclick = () => {
+  if (!ctxPoint) return;
+  navigator.clipboard?.writeText(`${ctxPoint.lat.toFixed(6)}, ${ctxPoint.lon.toFixed(6)}`);
+  ctxClose();
+};
+
+$('addrClose').onclick = addrClose;
+
 /* ── 생성 · 폴링 · 다운로드 ────────────────────── */
 let pollTimer = null;
 

@@ -230,6 +230,19 @@ async def parcels_preview(
     return {"type": "FeatureCollection", "features": features}
 
 
+@app.get("/api/address")
+async def address(lon: float = Query(...), lat: float = Query(...)):
+    """지도에서 우클릭한 지점의 지번주소·도로명주소."""
+    if not (124 < lon < 132 and 33 < lat < 39):
+        raise HTTPException(400, "국내 좌표 범위를 벗어났습니다.")
+    try:
+        return await vworld.reverse_geocode(lon, lat)
+    except vworld.VWorldError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"{type(exc).__name__}: {exc}"[:200]) from exc
+
+
 @app.get("/api/project")
 async def project_point(
     lon: float = Query(...), lat: float = Query(...), crs_code: str = Query(..., alias="crs"),

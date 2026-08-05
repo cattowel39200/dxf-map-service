@@ -115,6 +115,42 @@ button{font:inherit;color:inherit}
 .fav-del:hover{color:var(--danger);background:var(--danger-soft)}
 .fav-empty{padding:22px 14px;text-align:center;color:var(--text-3);font-size:11.5px;line-height:1.6}
 
+/* 지도 우클릭 메뉴 */
+.ctxmenu{position:absolute;z-index:30;min-width:184px;display:none;flex-direction:column;
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:var(--shadow-lg);padding:4px;overflow:hidden}
+.ctxmenu.on{display:flex}
+.ctx-coord{font-family:var(--mono);font-size:10px;color:var(--text-3);
+  padding:6px 9px 7px;border-bottom:1px solid var(--line-soft);margin-bottom:3px;
+  font-variant-numeric:tabular-nums}
+.ctx-item{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;
+  cursor:pointer;text-align:left;font-size:12.5px;color:var(--text);
+  padding:8px 9px;border-radius:6px}
+.ctx-item svg{width:15px;height:15px;flex:0 0 auto;color:var(--text-3)}
+.ctx-item:hover{background:var(--accent-soft);color:var(--accent-hi)}
+.ctx-item:hover svg{color:var(--accent-hi)}
+
+/* 주소 말풍선 */
+.addrpop{position:absolute;z-index:29;width:270px;display:none;
+  background:var(--panel);border:1px solid var(--accent-line);border-radius:8px;
+  box-shadow:var(--shadow-lg);transform:translate(-50%,-100%)}
+.addrpop.on{display:block}
+.addrpop::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:7px solid transparent;border-top-color:var(--panel)}
+.addr-head{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 8px 8px 12px;border-bottom:1px solid var(--line-soft)}
+.addr-title{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--accent-hi);font-weight:600}
+.addr-body{padding:11px 12px 12px}
+.addr-row + .addr-row{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
+.addr-k{font-size:10px;color:var(--text-3);margin-bottom:2px}
+.addr-v{font-size:12.5px;line-height:1.45;word-break:keep-all}
+.addr-v.none{color:var(--text-3);font-size:11.5px}
+.addr-copy{margin-top:10px;width:100%;border:1px solid var(--line);background:transparent;
+  border-radius:6px;padding:6px;font-size:11.5px;cursor:pointer;color:var(--text-2)}
+.addr-copy:hover{border-color:var(--accent-line);color:var(--accent-hi);background:var(--accent-soft)}
+.addr-load{padding:16px;text-align:center;color:var(--text-3);font-size:11.5px}
+
 .toolstack{top:70px;left:14px;display:flex;flex-direction:column;gap:8px}
 .toolgroup{background:var(--panel);border:1px solid var(--line);border-radius:8px;
   box-shadow:var(--shadow);display:flex;flex-direction:column}

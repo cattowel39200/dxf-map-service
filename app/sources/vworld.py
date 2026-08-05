@@ -80,6 +80,50 @@ async def fetch_parcels(box: BBox, progress=None):
     return out
 
 
+ADDRESS_URL = "https://api.vworld.kr/req/address"
+
+
+async def reverse_geocode(lon: float, lat: float) -> dict:
+    """좌표 → 주소. 지번주소와 도로명주소를 함께 돌려준다.
+
+    Data API와 마찬가지로 도메인 검사를 받으므로 등록된 도메인을 찾을 때까지
+    순서대로 시도한다.
+    """
+    if not config.VWORLD_KEY:
+        raise VWorldError("V-World 인증키가 없습니다.")
+
+    last = ""
+    async with httpx.AsyncClient(timeout=config.HTTP_TIMEOUT,
+                                 headers={"User-Agent": config.USER_AGENT}) as client:
+        for dom in config.VWORLD_DOMAINS:
+            r = await client.get(ADDRESS_URL, params={
+                "service": "address", "request": "getAddress", "version": "2.0",
+                "crs": "epsg:4326", "point": f"{lon},{lat}", "format": "json",
+                "type": "both", "zipcode": "true", "simple": "false",
+                "key": config.VWORLD_KEY, "domain": dom,
+            })
+            r.raise_for_status()
+            body = r.json().get("response", {})
+            status = body.get("status")
+
+            if status == "OK":
+                out = {"parcel": None, "road": None, "zipcode": None}
+                for item in body.get("result", []) or []:
+                    kind = item.get("type")
+                    if kind in ("parcel", "road"):
+                        out[kind] = item.get("text")
+                    out["zipcode"] = out["zipcode"] or item.get("zipcode")
+                return out
+            if status == "NOT_FOUND":
+                return {"parcel": None, "road": None, "zipcode": None}
+
+            last = (body.get("error") or {}).get("text") or status or ""
+            if "인증키" not in last:
+                break
+
+    raise VWorldError(f"주소를 가져오지 못했습니다: {last or '알 수 없는 오류'}")
+
+
 async def _get_page(client, box, page, domains):
     """등록된 도메인을 찾을 때까지 순서대로 시도한다.
 
