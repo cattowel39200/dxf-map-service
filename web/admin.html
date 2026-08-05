@@ -47,6 +47,31 @@ body{overflow:auto}
 .chart .bar:hover .tip{opacity:1}
 .axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:6px}
 
+/* 공지 관리 */
+.nform{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;
+  padding-bottom:14px;border-bottom:1px solid var(--line-soft)}
+.nform input[type=text],.nform textarea,.nform select{border:1px solid var(--line);
+  background:var(--sunken);border-radius:7px;padding:8px 10px;font:inherit;
+  font-size:12.5px;color:var(--text);outline:none;width:100%;resize:vertical}
+.nform input:focus,.nform textarea:focus,.nform select:focus{border-color:var(--accent);background:var(--panel)}
+.nrow{display:flex;align-items:center;gap:10px}
+.nrow select{width:auto;min-width:96px}
+.ncheck{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer}
+.ncheck input{width:14px;height:14px;margin:0;cursor:pointer;accent-color:var(--accent)}
+.ncta{width:auto;margin-left:auto;padding:8px 18px;font-size:12.5px}
+.nitem{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-soft)}
+.nitem:last-child{border-bottom:0}
+.nitem.off{opacity:.45}
+.nbody{flex:1;min-width:0}
+.ntop{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ntitle{font-size:12.5px;font-weight:600}
+.ntext{font-size:11.5px;color:var(--text-3);margin-top:3px;white-space:pre-wrap;line-height:1.5}
+.nacts{display:flex;gap:5px;flex:0 0 auto}
+.nbtn{border:1px solid var(--line);background:transparent;border-radius:5px;padding:4px 9px;
+  font-size:11px;cursor:pointer;color:var(--text-2)}
+.nbtn:hover{border-color:var(--accent-line);color:var(--accent-hi)}
+.nbtn.del:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-soft)}
+
 table{width:100%;border-collapse:collapse;font-size:11.5px}
 th{text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--text-3);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
@@ -89,6 +114,26 @@ td.mono{font-family:var(--mono);font-size:10.5px}
   </div>
 
   <div class="cards" id="cards"></div>
+
+  <div class="panelbox">
+    <h2>공지사항 <span class="cnt" id="noticeCnt"></span></h2>
+    <div class="pad">
+      <div class="nform">
+        <input type="text" id="nTitle" placeholder="제목" maxlength="120">
+        <textarea id="nBody" placeholder="내용 (줄바꿈 가능, 비워도 됩니다)" rows="3"></textarea>
+        <div class="nrow">
+          <select id="nKind">
+            <option value="info">안내</option>
+            <option value="warn">주의</option>
+            <option value="event">소식</option>
+          </select>
+          <label class="ncheck"><input type="checkbox" id="nPopup" checked> 접속 시 팝업</label>
+          <button class="cta ncta" id="nAdd">등록</button>
+        </div>
+      </div>
+      <div id="nList"></div>
+    </div>
+  </div>
 
   <div class="panelbox">
     <h2>일자별 추출 <span class="cnt" id="chartNote"></span></h2>
@@ -222,6 +267,67 @@ function render(d) {
       <td class="mono">${r.ip ?? '—'}</td></tr>`);
 }
 
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    ...opts,
+    headers: { 'X-Admin-Token': TOKEN, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
+  return r.status === 204 ? null : r.json();
+}
+
+const NKIND = { info: '안내', warn: '주의', event: '소식' };
+
+async function loadNotices() {
+  let list = [];
+  try { list = (await api('/api/admin/notices')).notices || []; }
+  catch { return; }
+  const live = list.filter(n => n.active).length;
+  $('noticeCnt').textContent = `${list.length}건 · 노출 중 ${live}건`;
+  $('nList').innerHTML = list.length ? list.map(n => `
+    <div class="nitem${n.active ? '' : ' off'}">
+      <div class="nbody">
+        <div class="ntop">
+          <span class="pill ${n.kind === 'warn' ? 'err' : n.kind === 'event' ? 'web' : 'cad'}">${NKIND[n.kind] || n.kind}</span>
+          <span class="ntitle">${esc(n.title)}</span>
+          ${n.popup ? '<span class="pill web">팝업</span>' : ''}
+          ${n.active ? '' : '<span class="pill err">숨김</span>'}
+        </div>
+        ${n.body ? `<div class="ntext">${esc(n.body)}</div>` : ''}
+      </div>
+      <div class="nacts">
+        <button class="nbtn" data-toggle="${n.id}" data-on="${n.active ? 1 : 0}">${n.active ? '숨기기' : '노출'}</button>
+        <button class="nbtn del" data-del="${n.id}">삭제</button>
+      </div>
+    </div>`).join('') : '<div class="empty">등록된 공지가 없습니다.</div>';
+
+  $('nList').querySelectorAll('[data-toggle]').forEach(b => b.onclick = async () => {
+    await api(`/api/admin/notices/${b.dataset.toggle}`, {
+      method: 'PATCH', body: JSON.stringify({ active: b.dataset.on !== '1' }) });
+    loadNotices();
+  });
+  $('nList').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if (!confirm('이 공지를 삭제할까요?')) return;
+    await api(`/api/admin/notices/${b.dataset.del}`, { method: 'DELETE' });
+    loadNotices();
+  });
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+$('nAdd').onclick = async () => {
+  const title = $('nTitle').value.trim();
+  if (!title) { $('nTitle').focus(); return; }
+  try {
+    await api('/api/admin/notices', { method: 'POST', body: JSON.stringify({
+      title, body: $('nBody').value, kind: $('nKind').value, popup: $('nPopup').checked }) });
+    $('nTitle').value = ''; $('nBody').value = '';
+    loadNotices();
+  } catch (e) { alert(e.message); }
+};
+
 async function open_() {
   try {
     const d = await load();
@@ -229,6 +335,7 @@ async function open_() {
     $('wrap').style.display = '';
     localStorage.setItem('ksAdminToken', TOKEN);
     render(d);
+    loadNotices();
   } catch (e) {
     $('gate').style.display = '';
     $('wrap').style.display = 'none';

@@ -619,6 +619,67 @@ $('ctxCopy').onclick = () => {
 
 $('addrClose').onclick = addrClose;
 
+/* ── 공지사항 팝업 ──────────────────────────────
+   '오늘 하루 보지 않기'는 공지 하나 단위로 기억한다. 새 공지가 올라오면
+   이전에 숨겼더라도 다시 뜬다. */
+const NOTICE_SKIP_KEY = 'ksNoticeSkip';
+const KIND_LABEL = { info: '안내', warn: '주의', event: '소식' };
+
+function noticeSkipMap() {
+  try { return JSON.parse(localStorage.getItem(NOTICE_SKIP_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+async function loadNotices() {
+  let list;
+  try {
+    const r = await fetch('/api/notices');
+    if (!r.ok) return;
+    list = (await r.json()).notices || [];
+  } catch { return; }
+
+  const skip = noticeSkipMap();
+  const today = todayKey();
+  const show = list.filter(n => skip[n.id] !== today);
+  if (!show.length) return;
+
+  $('noticeTitle').textContent = show.length > 1 ? `공지사항 ${show.length}건` : '공지사항';
+  $('noticeList').innerHTML = show.map(n => `
+    <div class="notice-item ${n.kind}">
+      <div class="notice-top">
+        <span class="notice-badge ${n.kind}">${KIND_LABEL[n.kind] || '안내'}</span>
+        <span class="notice-t">${esc(n.title)}</span>
+        <span class="notice-date">${new Date(n.created * 1000)
+          .toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</span>
+      </div>
+      ${n.body ? `<div class="notice-b">${esc(n.body)}</div>` : ''}
+    </div>`).join('');
+
+  $('noticeSkip').checked = false;
+  $('noticeScrim').classList.add('on');
+
+  const close = () => {
+    if ($('noticeSkip').checked) {
+      const m = noticeSkipMap();
+      show.forEach(n => { m[n.id] = today; });
+      localStorage.setItem(NOTICE_SKIP_KEY, JSON.stringify(m));
+    }
+    $('noticeScrim').classList.remove('on');
+  };
+  $('noticeClose').onclick = close;
+  $('noticeX').onclick = close;
+  $('noticeScrim').onclick = e => { if (e.target === $('noticeScrim')) close(); };
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /* ── 생성 · 폴링 · 다운로드 ────────────────────── */
 let pollTimer = null;
 
@@ -792,4 +853,5 @@ $('doneScrim').onclick = e => { if (e.target === $('doneScrim')) $('doneScrim').
   refreshScale();
   refreshSummary();
   loadParcelPreview();
+  loadNotices();
 })();

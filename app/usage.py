@@ -7,51 +7,15 @@ SQLite 파일 하나만 쓴다. 별도 DB 서버가 필요 없고, 서버를 다
 남는다. 초당 수십 건 수준까지는 이걸로 충분하다.
 """
 import sqlite3
-import threading
 import time
-from pathlib import Path
 
-from . import config
+from . import db
 
-_lock = threading.Lock()
-_conn: sqlite3.Connection | None = None
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS jobs (
-    id          TEXT PRIMARY KEY,
-    created     REAL NOT NULL,
-    ip          TEXT,
-    source      TEXT,              -- web | cad
-    crs         TEXT,
-    layers      TEXT,
-    area_km2    REAL,
-    lon         REAL,
-    lat         REAL,
-    parcels     INTEGER,
-    objects     INTEGER,
-    size        INTEGER,
-    elapsed     REAL,
-    state       TEXT,              -- done | error
-    error       TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created);
-CREATE TABLE IF NOT EXISTS downloads (
-    job_id  TEXT,
-    at      REAL,
-    ip      TEXT
-);
-"""
+_lock = db.lock()
 
 
 def _db() -> sqlite3.Connection:
-    global _conn
-    if _conn is None:
-        config.USAGE_DB.parent.mkdir(parents=True, exist_ok=True)
-        _conn = sqlite3.connect(config.USAGE_DB, check_same_thread=False)
-        _conn.row_factory = sqlite3.Row
-        _conn.executescript(SCHEMA)
-        _conn.commit()
-    return _conn
+    return db.connect()
 
 
 def record(job, meta: dict):

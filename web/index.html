@@ -243,6 +243,21 @@
   </footer>
 </div>
 
+<!-- 공지사항 팝업 -->
+<div class="scrim" id="noticeScrim">
+  <div class="modal notice-modal">
+    <div class="notice-head">
+      <h2 id="noticeTitle">공지사항</h2>
+      <button class="x-btn" id="noticeX" aria-label="닫기">✕</button>
+    </div>
+    <div id="noticeList"></div>
+    <label class="notice-skip">
+      <input type="checkbox" id="noticeSkip"> 오늘 하루 보지 않기
+    </label>
+    <button class="cta" id="noticeClose">확인</button>
+  </div>
+</div>
+
 <div class="scrim" id="progScrim">
   <div class="modal">
     <h2>DXF 생성 중</h2>

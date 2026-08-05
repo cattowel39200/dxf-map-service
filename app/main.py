@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, crs, jobs, usage
+from . import config, crs, jobs, notices, usage
 from .geom import BBox
 from .sources import vworld
 
@@ -359,6 +359,50 @@ def _require_admin(request: Request):
 async def usage_stats(request: Request, days: int = 30):
     _require_admin(request)
     return usage.stats(max(7, min(days, 90)))
+
+
+# ── 공지사항 ──────────────────────────────────────────────
+@app.get("/api/notices")
+async def notices_public():
+    """서비스 화면이 접속할 때 띄울 공지."""
+    return {"notices": notices.active(popup_only=True)}
+
+
+@app.get("/api/admin/notices")
+async def notices_list(request: Request):
+    _require_admin(request)
+    return {"notices": notices.list_all()}
+
+
+@app.post("/api/admin/notices")
+async def notices_create(request: Request):
+    _require_admin(request)
+    b = await request.json()
+    title = (b.get("title") or "").strip()
+    if not title:
+        raise HTTPException(400, "제목을 입력하세요.")
+    return notices.create(
+        title=title, body=b.get("body") or "", kind=b.get("kind") or "info",
+        popup=bool(b.get("popup", True)),
+        starts=b.get("starts"), ends=b.get("ends"))
+
+
+@app.patch("/api/admin/notices/{nid}")
+async def notices_update(nid: int, request: Request):
+    _require_admin(request)
+    b = await request.json()
+    out = notices.update(nid, **b)
+    if not out:
+        raise HTTPException(404, "공지를 찾을 수 없습니다.")
+    return out
+
+
+@app.delete("/api/admin/notices/{nid}")
+async def notices_delete(nid: int, request: Request):
+    _require_admin(request)
+    if not notices.delete(nid):
+        raise HTTPException(404, "공지를 찾을 수 없습니다.")
+    return {"ok": True}
 
 
 def _asset_version() -> str:
