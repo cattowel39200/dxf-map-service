@@ -79,6 +79,63 @@ async def tile(layer: str, z: int, y: int, x: int):
     )
 
 
+@app.get("/api/diag")
+async def diagnose():
+    """V-World 연결을 그대로 시험해 결과를 돌려준다.
+
+    배포 환경에서 지적 데이터가 안 나올 때 원인이 네트워크인지, 인증인지,
+    도메인인지 구분하려고 둔다. 인증키는 앞뒤 4자만 남겨 가린다.
+    """
+    key = config.VWORLD_KEY
+    masked = f"{len(key)}자 ...{key[-4:]}" if len(key) > 8 else "(없음)"
+    out = {"key": masked, "domains": config.VWORLD_DOMAINS, "checks": []}
+
+    async with httpx.AsyncClient(timeout=30.0,
+                                 headers={"User-Agent": config.USER_AGENT}) as c:
+        # 1) 순수 연결 확인 — 인증키 없이도 응답이 오면 네트워크는 정상
+        for label, params in [
+            ("data-noauth", {"service": "data", "request": "GetFeature",
+                             "data": "LP_PA_CBND_BUBUN", "key": "X", "format": "json",
+                             "size": 1, "geomFilter": "BOX(126.93,37.18,126.94,37.19)"}),
+        ] + [
+            (f"data-domain={d}", {"service": "data", "request": "GetFeature",
+                                  "data": "LP_PA_CBND_BUBUN", "key": key, "domain": d,
+                                  "format": "json", "geometry": "false", "size": 1,
+                                  "crs": "EPSG:4326",
+                                  "geomFilter": "BOX(126.938,37.180,126.940,37.182)"})
+            for d in config.VWORLD_DOMAINS
+        ]:
+            rec = {"check": label}
+            try:
+                r = await c.get(config.VWORLD_DATA_URL, params=params)
+                rec["http"] = r.status_code
+                try:
+                    b = r.json().get("response", {})
+                    rec["status"] = b.get("status")
+                    rec["error"] = (b.get("error") or {}).get("text", "")[:120]
+                except ValueError:
+                    rec["body"] = r.text[:120]
+            except Exception as exc:  # noqa: BLE001
+                rec["exception"] = f"{type(exc).__name__}: {exc}"[:160]
+            out["checks"].append(rec)
+
+        # 2) 배경지도 타일
+        rec = {"check": "wmts-tile"}
+        try:
+            r = await c.get(config.VWORLD_TILE_URL.format(
+                key=key, layer="Base", z=16, y=25361, x=55917, ext="png"))
+            rec["http"] = r.status_code
+            rec["bytes"] = len(r.content)
+            rec["content_type"] = r.headers.get("content-type", "")
+            if r.status_code != 200:
+                rec["body"] = r.text[:160]
+        except Exception as exc:  # noqa: BLE001
+            rec["exception"] = f"{type(exc).__name__}: {exc}"[:160]
+        out["checks"].append(rec)
+
+    return out
+
+
 @app.get("/api/parcels")
 async def parcels_preview(
     bbox: str = Query(..., description="minLon,minLat,maxLon,maxLat"),
@@ -91,6 +148,8 @@ async def parcels_preview(
         items = await vworld.fetch_parcels(box)
     except vworld.VWorldError as exc:
         raise HTTPException(502, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001 — 원인을 삼키지 않는다
+        raise HTTPException(502, f"{type(exc).__name__}: {exc}"[:200]) from exc
 
     features = [{
         "type": "Feature",
