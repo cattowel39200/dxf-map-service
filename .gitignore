@@ -39,3 +39,6 @@ server.err
 .idea/
 Thumbs.db
 desktop.ini
+
+# AN_lisp 에서 걷어낸 옛 파일 보관용. 저장소 본문과 겹친다.
+cad/an_lisp_backup/
