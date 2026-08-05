@@ -5,6 +5,8 @@ V-World 인증키는 프론트엔드로 내보내지 않는다. 배경지도 타
 """
 import asyncio
 import contextlib
+import os
+from collections import OrderedDict
 from pathlib import Path
 
 import httpx
@@ -55,28 +57,91 @@ async def get_config():
     }
 
 
+# 타일은 한 번 받으면 바뀌지 않는다. 같은 타일을 V-World에 다시 묻지 않도록
+# 메모리에 들고 있는다. 8000장이면 대략 80 MB 안쪽이다.
+_TILE_CACHE: "OrderedDict[str, tuple[bytes, str]]" = OrderedDict()
+_TILE_CACHE_MAX = int(os.getenv("TILE_CACHE_MAX", "8000"))
+_tile_lock = asyncio.Lock()
+# 같은 타일을 동시에 여러 번 요청해도 V-World에는 한 번만 간다.
+_tile_inflight: dict[str, asyncio.Future] = {}
+
+
 @app.get("/api/tiles/{layer}/{z}/{y}/{x}")
 async def tile(layer: str, z: int, y: int, x: int):
-    """V-World WMTS 중계. 인증키를 브라우저에 노출하지 않기 위한 경유지."""
+    """V-World WMTS 중계.
+
+    인증키를 브라우저에 노출하지 않으려고 서버가 대신 받아 준다. 대신 왕복이
+    길어지므로 메모리에 캐시하고, 응답 헤더로 Cloudflare 엣지에도 캐시시킨다.
+    """
     if layer not in TILE_LAYERS:
         raise HTTPException(404, "알 수 없는 배경지도")
     if not config.VWORLD_KEY:
         raise HTTPException(503, "V-World 인증키가 설정되지 않았습니다.")
+
     ext = TILE_LAYERS[layer]
+    key = f"{layer}/{z}/{y}/{x}"
+
+    hit = _TILE_CACHE.get(key)
+    if hit is not None:
+        _TILE_CACHE.move_to_end(key)
+        return _tile_response(hit[0], hit[1], cached=True)
+
+    async with _tile_lock:
+        fut = _tile_inflight.get(key)
+        if fut is None:
+            fut = asyncio.get_running_loop().create_future()
+            _tile_inflight[key] = fut
+            owner = True
+        else:
+            owner = False
+
+    if not owner:
+        data, ctype = await fut
+        if data is None:
+            return Response(status_code=204)
+        return _tile_response(data, ctype, cached=True)
+
     url = config.VWORLD_TILE_URL.format(
         key=config.VWORLD_KEY, layer=layer, z=z, y=y, x=x, ext=ext)
+    ctype = "image/jpeg" if ext == "jpeg" else "image/png"
+    data = None
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.get(url, headers={"User-Agent": config.USER_AGENT})
+        if r.status_code == 200:
+            data = r.content
+            _TILE_CACHE[key] = (data, ctype)
+            while len(_TILE_CACHE) > _TILE_CACHE_MAX:
+                _TILE_CACHE.popitem(last=False)
     except httpx.HTTPError:
-        raise HTTPException(502, "배경지도 서버에 연결할 수 없습니다.") from None
-    if r.status_code != 200:
+        data = None
+    finally:
+        async with _tile_lock:
+            _tile_inflight.pop(key, None)
+        if not fut.done():
+            fut.set_result((data, ctype))
+
+    if data is None:
         return Response(status_code=204)
+    return _tile_response(data, ctype)
+
+
+def _tile_response(data: bytes, ctype: str, cached: bool = False) -> Response:
     return Response(
-        content=r.content,
-        media_type="image/jpeg" if ext == "jpeg" else "image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
+        content=data,
+        media_type=ctype,
+        headers={
+            # 타일은 사실상 불변이다. 브라우저와 Cloudflare 모두 오래 들고 있게 한다.
+            "Cache-Control": "public, max-age=2592000, s-maxage=2592000, immutable",
+            "X-Tile-Cache": "hit" if cached else "miss",
+        },
     )
+
+
+@app.get("/api/tiles/_stats")
+async def tile_stats():
+    return {"cached": len(_TILE_CACHE), "max": _TILE_CACHE_MAX,
+            "inflight": len(_tile_inflight)}
 
 
 @app.get("/api/diag")
