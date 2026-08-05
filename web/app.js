@@ -1119,7 +1119,6 @@ function themeApply() {
         <input type="checkbox" data-theme="${esc(r.name)}"
                ${themeOn.has(r.name) ? 'checked' : ''}>
         <span>${esc(r.title)}</span>
-        <span class="tag${r.extract ? '' : ' view'}">${r.extract ? '추출' : '보기'}</span>
       </label>`).join('')
       : '<div class="theme-empty">찾는 주제도가 없습니다.</div>';
   };
