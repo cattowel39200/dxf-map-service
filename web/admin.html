@@ -47,6 +47,27 @@ body{overflow:auto}
 .chart .bar:hover .tip{opacity:1}
 .axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:6px}
 
+/* 신청자 관리 */
+.appmail{font-weight:600;font-size:12px}
+.appwho{font-size:11px;color:var(--text-3);margin-top:1px}
+.lickey{font-family:var(--mono);font-size:11px;font-weight:600}
+.licmeta{font-size:10px;color:var(--text-3);margin-top:1px}
+.sendbtns{display:flex;gap:5px;justify-content:flex-end}
+.sbtn{border:1px solid var(--line);background:transparent;border-radius:5px;
+  padding:5px 10px;font-size:11px;cursor:pointer;color:var(--text-2);white-space:nowrap}
+.sbtn:hover:not(:disabled){border-color:var(--accent-line);color:var(--accent-hi);background:var(--accent-soft)}
+.sbtn.full{border-color:var(--accent);color:var(--accent-hi);font-weight:600}
+.sbtn.full:hover:not(:disabled){background:var(--accent);color:#fff}
+.sbtn:disabled{opacity:.45;cursor:not-allowed}
+.sbtn.danger:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-soft)}
+.licrow{display:flex;flex-direction:column;gap:6px}
+.licline{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mailwarn{margin:0 0 12px;padding:10px 12px;border-radius:7px;font-size:12px;
+  background:var(--warn-soft);color:var(--warn);
+  border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);display:none}
+.mailwarn.on{display:block}
+td.wrap{white-space:normal}
+
 /* 공지 관리 */
 .nform{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;
   padding-bottom:14px;border-bottom:1px solid var(--line-soft)}
@@ -114,6 +135,15 @@ td.mono{font-family:var(--mono);font-size:10.5px}
   </div>
 
   <div class="cards" id="cards"></div>
+
+  <div class="panelbox">
+    <h2>사용 신청자 <span class="cnt" id="appCnt"></span></h2>
+    <div class="pad" style="padding-bottom:0">
+      <p class="mailwarn" id="mailWarn">메일 계정이 설정되지 않아 발송할 수 없습니다.
+        <code>.env</code> 의 <code>SMTP_USER</code> / <code>SMTP_PASS</code> 를 확인하세요.</p>
+    </div>
+    <div class="scroll"><table id="tApp"></table></div>
+  </div>
 
   <div class="panelbox">
     <h2>공지사항 <span class="cnt" id="noticeCnt"></span></h2>
@@ -277,6 +307,106 @@ async function api(path, opts = {}) {
 }
 
 const NKIND = { info: '안내', warn: '주의', event: '소식' };
+const ASTATUS = { new: ['신청', 'cad'], demo: ['데모', 'web'], paid: ['정품', 'ok'], blocked: ['차단', 'err'] };
+
+function licBlock(l) {
+  const badges = [
+    `<span class="pill ${l.kind === 'full' ? 'ok' : 'cad'}">${l.kind === 'full' ? '정품' : '데모'}</span>`,
+    l.revoked ? '<span class="pill err">중지</span>' : '',
+    l.expired ? '<span class="pill err">만료</span>' : '',
+  ].join('');
+  const until = l.expires_at
+    ? new Date(l.expires_at * 1000).toLocaleDateString('ko-KR') + '까지'
+    : '기간 제한 없음';
+  const acts = [
+    l.kind === 'demo' ? `<button class="sbtn" data-lic="upgrade" data-key="${l.key}">정품 전환</button>` : '',
+    `<button class="sbtn" data-lic="reset-machine" data-key="${l.key}">PC 해제</button>`,
+    `<button class="sbtn danger" data-lic="${l.revoked ? 'unrevoke' : 'revoke'}" data-key="${l.key}">${l.revoked ? '중지 해제' : '사용 중지'}</button>`,
+  ].join('');
+  return `<div>
+    <div class="licline"><span class="lickey">${l.key}</span>${badges}</div>
+    <div class="licmeta">${l.machine ? 'PC 등록됨' : 'PC 미등록'} · 사용 ${l.uses}회 · ${until}</div>
+    <div class="licline" style="margin-top:3px">${acts}</div>
+  </div>`;
+}
+
+async function loadApplicants() {
+  let d;
+  try { d = await api('/api/admin/applicants'); } catch { return; }
+  const list = d.applicants || [];
+  $('appCnt').textContent = `${list.length}명 · 데모 ${list.filter(a => a.status === 'demo').length}` +
+    ` · 정품 ${list.filter(a => a.status === 'paid').length}`;
+  $('mailWarn').classList.toggle('on', !d.mail_ready);
+
+  if (!list.length) {
+    $('tApp').innerHTML = '<tbody><tr><td class="empty" colspan="5">아직 신청자가 없습니다.</td></tr></tbody>';
+    return;
+  }
+
+  $('tApp').innerHTML = '<thead><tr><th>신청자</th><th>상태</th><th>발급키</th><th>신청일</th>' +
+    '<th style="text-align:right">발송 · 관리</th></tr></thead><tbody>' +
+    list.map(a => {
+      const st = ASTATUS[a.status] || ['?', 'cad'];
+      const lic = (a.licenses || []).slice().reverse();
+      const who = [a.name, a.company].filter(Boolean).join(' · ') || '—';
+      return `<tr>
+        <td class="wrap">
+          <div class="appmail">${esc(a.email)}</div>
+          <div class="appwho">${esc(who)}</div>
+          ${a.memo ? `<div class="appwho">${esc(a.memo)}</div>` : ''}
+        </td>
+        <td><span class="pill ${st[1]}">${st[0]}</span></td>
+        <td class="wrap">${lic.length
+          ? `<div class="licrow">${lic.map(licBlock).join('')}</div>`
+          : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td class="num">${new Date(a.created * 1000)
+          .toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</td>
+        <td>
+          <div class="sendbtns">
+            <button class="sbtn" data-send="demo" data-email="${esc(a.email)}" data-name="${esc(a.name || '')}">데모 보내기</button>
+            <button class="sbtn full" data-send="full" data-email="${esc(a.email)}" data-name="${esc(a.name || '')}">정품 보내기</button>
+            <button class="sbtn danger" data-appdel="${a.id}">삭제</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('') + '</tbody>';
+
+  $('tApp').querySelectorAll('[data-send]').forEach(b => b.onclick = async () => {
+    const kind = b.dataset.send;
+    const label = kind === 'full' ? '정품' : '데모';
+    if (!confirm(b.dataset.email + ' 로 ' + label + ' 발급키와 사용법을 보낼까요?')) return;
+    const orig = b.textContent;
+    b.disabled = true; b.textContent = '보내는 중…';
+    try {
+      const r = await api('/api/admin/send', {
+        method: 'POST',
+        body: JSON.stringify({ email: b.dataset.email, name: b.dataset.name, kind }),
+      });
+      alert(label + ' 발송 완료\n발급키 ' + r.key +
+        (r.attached ? '\n설치 파일도 첨부했습니다.' : '\n(설치 파일이 없어 본문만 보냈습니다)'));
+      loadApplicants();
+    } catch (e) {
+      alert('발송 실패: ' + e.message);
+    } finally { b.disabled = false; b.textContent = orig; }
+  });
+
+  $('tApp').querySelectorAll('[data-lic]').forEach(b => b.onclick = async () => {
+    const act = b.dataset.lic;
+    const ko = { upgrade: '정품으로 전환', 'reset-machine': 'PC 묶임을 해제',
+                 revoke: '사용을 중지', unrevoke: '중지를 해제' }[act];
+    if (!confirm(b.dataset.key + ' 를 ' + ko + '할까요?')) return;
+    try {
+      await api('/api/admin/license/' + b.dataset.key + '/' + act, { method: 'POST' });
+      loadApplicants();
+    } catch (e) { alert(e.message); }
+  });
+
+  $('tApp').querySelectorAll('[data-appdel]').forEach(b => b.onclick = async () => {
+    if (!confirm('이 신청자를 목록에서 지울까요? 발급한 키는 그대로 남습니다.')) return;
+    await api('/api/admin/applicants/' + b.dataset.appdel, { method: 'DELETE' });
+    loadApplicants();
+  });
+}
 
 async function loadNotices() {
   let list = [];
@@ -336,6 +466,7 @@ async function open_() {
     localStorage.setItem('ksAdminToken', TOKEN);
     render(d);
     loadNotices();
+    loadApplicants();
   } catch (e) {
     $('gate').style.display = '';
     $('wrap').style.display = 'none';

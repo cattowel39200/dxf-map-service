@@ -20,6 +20,9 @@
     </div>
     <div class="topbar-spacer"></div>
     <div class="tb-note"><span class="dot-live" id="keyDot"></span><span id="keyMsg">연결 확인 중</span></div>
+    <button class="ghost-btn" id="boardBtn">
+      공지사항<span class="badge" id="boardBadge"></span>
+    </button>
     <button class="ghost-btn" id="themeBtn">◐ 테마</button>
     <a class="ghost-btn icon-btn" href="/admin" target="_blank" rel="noopener"
        title="사용 현황" aria-label="사용 현황">
@@ -95,6 +98,16 @@
         <button id="zin" aria-label="확대">+</button>
         <button id="zout" aria-label="축소">−</button>
       </div>
+
+      <a class="map-float cadbtn" href="/cad" title="AutoCAD에서 바로 지적도 불러오기">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <rect x="2.5" y="3.5" width="15" height="13" rx="1.6" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M2.5 7.5h15M7 7.5v9M12 7.5v9M2.5 12h15" stroke="currentColor" stroke-width="1.1" opacity=".55"/>
+          <path d="M10 9.5v4.6M8.1 12.3L10 14.2l1.9-1.9" stroke="currentColor"
+                stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>CAD에서 지적도 불러오기</span>
+      </a>
 
       <div class="map-float selchip" id="selchip">
         <div class="selchip-head">
@@ -241,6 +254,18 @@
     <div class="sb"><span class="sb-k">CRS</span><b id="sb-crs">—</b></div>
     <div class="sb grow">출처 국토교통부 V-World 연속지적도</div>
   </footer>
+</div>
+
+<!-- 공지사항 게시판 -->
+<div class="scrim" id="boardScrim">
+  <div class="modal board-modal">
+    <div class="notice-head">
+      <h2>공지사항</h2>
+      <button class="x-btn" id="boardX" aria-label="닫기">✕</button>
+    </div>
+    <div id="boardList" class="board-list"></div>
+    <button class="btn-2" id="boardClose" style="width:100%">닫기</button>
+  </div>
 </div>
 
 <!-- 공지사항 팝업 -->

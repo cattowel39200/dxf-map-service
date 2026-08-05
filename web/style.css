@@ -175,6 +175,27 @@ button{font:inherit;color:inherit}
 .notice-skip input:checked::after{content:"";width:8px;height:5px;border-left:2px solid #fff;
   border-bottom:2px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
 
+/* 상단바 공지 버튼의 새 글 표시 */
+.badge{display:none;min-width:16px;height:16px;padding:0 4px;margin-left:5px;
+  border-radius:99px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;
+  line-height:16px;text-align:center;vertical-align:1px}
+.badge.on{display:inline-block}
+
+/* 공지 게시판 */
+.board-modal{width:min(560px,100%)}
+.board-list{max-height:min(56vh,460px);overflow-y:auto;margin-bottom:14px;
+  overscroll-behavior:contain}
+.board-empty{padding:32px 16px;text-align:center;color:var(--text-3);font-size:12.5px}
+
+/* 지도 우측 최하단 CAD 버튼 */
+.cadbtn{bottom:16px;right:60px;display:flex;align-items:center;gap:9px;
+  background:var(--accent);color:#fff;text-decoration:none;border-radius:8px;
+  padding:9px 15px 9px 12px;font-size:12.5px;font-weight:600;
+  box-shadow:var(--shadow-lg);transition:background .13s}
+.cadbtn:hover{background:var(--accent-hi)}
+.cadbtn svg{width:19px;height:19px;flex:0 0 auto}
+@media (max-width:640px){.cadbtn span{display:none}.cadbtn{padding:10px;right:58px}}
+
 .toolstack{top:70px;left:14px;display:flex;flex-direction:column;gap:8px}
 .toolgroup{background:var(--panel);border:1px solid var(--line);border-radius:8px;
   box-shadow:var(--shadow);display:flex;flex-direction:column}

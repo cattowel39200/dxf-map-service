@@ -61,6 +61,10 @@ async def get_config():
         "tile_url": (config.VWORLD_TILE_URL.replace("{key}", config.VWORLD_KEY)
                      if config.TILE_DIRECT and config.VWORLD_KEY else None),
         "tile_layers": TILE_LAYERS,
+        "bank": config.BANK_INFO,
+        "demo_days": config.DEMO_DAYS,
+        "has_package": (WEB / "download" / "CADMAP-setup.zip").exists(),
+        "youtube": config.YOUTUBE_ID,
     }
 
 
@@ -448,9 +452,9 @@ async def admin_applicant_delete(aid: int, request: Request):
 
 # ── 공지사항 ──────────────────────────────────────────────
 @app.get("/api/notices")
-async def notices_public():
-    """서비스 화면이 접속할 때 띄울 공지."""
-    return {"notices": notices.active(popup_only=True)}
+async def notices_public(all: int = 0):
+    """all=0 이면 접속 시 팝업으로 띄울 것만, all=1 이면 게시판용 전체."""
+    return {"notices": notices.active(popup_only=not all)}
 
 
 @app.get("/api/admin/notices")
@@ -498,7 +502,8 @@ def _asset_version() -> str:
     주소도 바뀌게 한다. 덕분에 캐시는 그대로 길게 두고도 갱신이 즉시 반영된다.
     """
     h = hashlib.sha1()
-    for name in sorted(("app.js", "style.css", "logo.svg", "index.html", "admin.html")):
+    for name in sorted(("app.js", "style.css", "logo.svg",
+                        "index.html", "admin.html", "cad.html")):
         f = WEB / name
         if f.exists():
             st = f.stat()
@@ -523,6 +528,11 @@ def _serve_page(name: str) -> Response:
 @app.get("/")
 async def index_page():
     return _serve_page("index.html")
+
+
+@app.get("/cad")
+async def cad_page():
+    return _serve_page("cad.html")
 
 
 @app.get("/admin")

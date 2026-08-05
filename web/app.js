@@ -680,6 +680,69 @@ function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/* ── 공지 게시판 ────────────────────────────────
+   상단 '공지사항' 버튼으로 연다. 팝업으로 뜨지 않는 공지도 여기서 볼 수 있다. */
+const BOARD_SEEN_KEY = 'ksBoardSeen';
+
+function noticeCard(n) {
+  return `
+    <div class="notice-item ${n.kind}">
+      <div class="notice-top">
+        <span class="notice-badge ${n.kind}">${KIND_LABEL[n.kind] || '안내'}</span>
+        <span class="notice-t">${esc(n.title)}</span>
+        <span class="notice-date">${new Date(n.created * 1000)
+          .toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}</span>
+      </div>
+      ${n.body ? `<div class="notice-b">${esc(n.body)}</div>` : ''}
+    </div>`;
+}
+
+async function openBoard() {
+  $('boardList').innerHTML = '<div class="board-empty">불러오는 중…</div>';
+  $('boardScrim').classList.add('on');
+  try {
+    const r = await fetch('/api/notices?all=1');
+    const list = (await r.json()).notices || [];
+    $('boardList').innerHTML = list.length
+      ? list.map(noticeCard).join('')
+      : '<div class="board-empty">등록된 공지가 없습니다.</div>';
+    if (list.length) {
+      localStorage.setItem(BOARD_SEEN_KEY, String(Math.max(...list.map(n => n.id))));
+      markBoardRead();
+    }
+  } catch {
+    $('boardList').innerHTML = '<div class="board-empty">공지를 불러오지 못했습니다.</div>';
+  }
+}
+
+function markBoardRead() {
+  $('boardBadge').classList.remove('on');
+  $('boardBadge').textContent = '';
+}
+
+/* 안 본 공지 개수를 상단 버튼에 표시한다 */
+async function refreshBoardBadge() {
+  try {
+    const r = await fetch('/api/notices?all=1');
+    const list = (await r.json()).notices || [];
+    const seen = Number(localStorage.getItem(BOARD_SEEN_KEY) || 0);
+    const fresh = list.filter(n => n.id > seen).length;
+    if (fresh) {
+      $('boardBadge').textContent = fresh;
+      $('boardBadge').classList.add('on');
+    } else {
+      markBoardRead();
+    }
+  } catch { /* 조용히 넘어간다 */ }
+}
+
+$('boardBtn').onclick = openBoard;
+$('boardX').onclick = () => $('boardScrim').classList.remove('on');
+$('boardClose').onclick = () => $('boardScrim').classList.remove('on');
+$('boardScrim').onclick = e => {
+  if (e.target === $('boardScrim')) $('boardScrim').classList.remove('on');
+};
+
 /* ── 생성 · 폴링 · 다운로드 ────────────────────── */
 let pollTimer = null;
 
@@ -854,4 +917,5 @@ $('doneScrim').onclick = e => { if (e.target === $('doneScrim')) $('doneScrim').
   refreshSummary();
   loadParcelPreview();
   loadNotices();
+  refreshBoardBadge();
 })();

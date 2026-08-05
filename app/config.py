@@ -45,6 +45,9 @@ DEMO_DAYS = int(os.getenv("DEMO_DAYS", "3"))
 
 SITE_URL = os.getenv("SITE_URL", "https://ks-down-map.com")
 
+# 소개 페이지에 띄울 유튜브 영상 ID (주소의 v= 뒤 11자). 비우면 자리만 표시한다.
+YOUTUBE_ID = os.getenv("YOUTUBE_ID", "")
+
 # 워커가 하나이고 작업 상태를 메모리에 두므로 동시 처리량을 제한한다.
 MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "3"))
 
