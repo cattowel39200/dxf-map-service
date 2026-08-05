@@ -1,7 +1,7 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "date": "2026-08-05",
-  "notice": "상단 메뉴가 안 보이던 것을 고쳤습니다.",
+  "notice": "옛 설정이 남아 추출이 거부되던 것을 고쳤습니다.",
   "min_version": "1.0.0",
   "files": {
     "lisp": "/dist/CADMAP.lsp",

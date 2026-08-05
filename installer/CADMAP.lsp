@@ -35,7 +35,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.4.3")
+(setq *cm:version* "1.4.4")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -404,6 +404,32 @@
   (princ))
 
 ;; 설정창에 보여 줄 요약
+(defun cm:join (lst sep / out)
+  (setq out "")
+  (foreach s lst (setq out (strcat out (if (= out "") "" sep) s)))
+  out)
+
+;; 옛 판에서 저장된 등고선·건물 같은 것이 남아 있으면 서버가 요청을
+;; 통째로 거부한다. 보내기 전에 서버가 아는 것만 남긴다.
+(defun cm:cleanlayers ( / cat keep bad)
+  (setq cat (cm:fetchcat))
+  (if (null cat)
+    (cm:picked)
+    (progn
+      (setq keep '() bad '())
+      (foreach k (cm:picked)
+        (if (vl-some '(lambda (r) (= (car r) k)) cat)
+          (setq keep (cons k keep))
+          (setq bad (cons k bad))))
+      (setq keep (reverse keep))
+      (if bad
+        (progn
+          (cm:msg (strcat "이제 없는 자료를 설정에서 뺐습니다: "
+                          (cm:join (reverse bad) ", ")))
+          (cm:setpicked keep)
+          (cm:regput "Layers" *cm:layers*)))
+      keep)))
+
 (defun cm:laysummary ( / n cat lab)
   (setq n (length (cm:picked)) cat (cm:fetchcat) lab "")
   (foreach k (cm:picked)
@@ -1459,14 +1485,12 @@
     (cm:msg "===== 지도 가져오기 설정 =====")
     (cm:msg (strcat "  서버       : " *cm:server*))
     (cm:msg (strcat "  좌표계     : EPSG:" *cm:crs* "   " (cm:crsname *cm:crs*)))
-    (cm:msg (strcat "  레이어     : " *cm:layers*))
-    (cm:msg (strcat "  등고선간격 : " (cm:num *cm:interval*) " m"))
-    (cm:msg (strcat "  삽입후분해 : " (if *cm:explode* "예" "아니오")))
+    (cm:msg (strcat "  받을 자료  : " (cm:laysummary)))
     (cm:msg (strcat "  발급키     : " (if (= (cm:n *cm:key* "") "")
                                         "없음 (발급키 명령으로 등록)" *cm:key*)))
-    (initget "좌표계 레이어 간격 서버 분해 발급키 종료")
+    (initget "좌표계 자료 서버 발급키 종료")
     (setq opt (getkword
-      "\n바꿀 항목 [좌표계/레이어/간격/서버/분해/발급키/종료] <종료>: "))
+      "\n바꿀 항목 [좌표계/자료/서버/발급키/종료] <종료>: "))
     (cond
       ((= opt "좌표계")
        (cm:msg "사용 가능한 좌표계")
@@ -1477,22 +1501,13 @@
                 (cm:msg (strcat "EPSG:" k " 로 바꿨습니다.")))
          (if (/= k "") (cm:msg "목록에 없는 코드입니다.")))
        (setq again T))
-      ((= opt "레이어")
-       (cm:msg "parcel=필지경계  pnu=지번지목  contour=등고선")
-       (cm:msg "building=건물   road=도로     water=수계   (쉼표 구분)")
-       (setq k (getstring T (strcat "\n레이어 <" *cm:layers* ">: ")))
-       (if (/= k "") (setq *cm:layers* k))
-       (setq again T))
-      ((= opt "간격")
-       (if (setq n (getreal (strcat "\n등고선 간격 m <" (cm:num *cm:interval*) ">: ")))
-         (setq *cm:interval* n))
+      ((= opt "자료")
+       ;; 손으로 치면 없는 이름을 넣게 된다. 목록에서 고르게 한다.
+       (cm:laydlg)
        (setq again T))
       ((= opt "서버")
        (setq k (getstring T (strcat "\n서버 주소 <" *cm:server* ">: ")))
        (if (/= k "") (setq *cm:server* (cm:normsrv k)))
-       (setq again T))
-      ((= opt "분해")
-       (setq *cm:explode* (not *cm:explode*))
        (setq again T))
       ((= opt "발급키")
        (C:CMKEY)
@@ -1630,6 +1645,7 @@
       (cm:msg "   정품 신청   : 정품신청 명령"))
     (progn
       (cm:msg (strcat "발급키 확인됨  " (cdr lic)))
+      (cm:cleanlayers)
       (setq go T)
       (while go
         (if (cm:Dialog (strcat "발급키 " (cdr lic)))
