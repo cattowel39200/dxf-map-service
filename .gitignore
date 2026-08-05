@@ -17,6 +17,11 @@ data/
 web/dist/*.exe
 web/dist/*.zip
 
+# 설치 프로그램 빌드 부산물. install.py 와 build.py 만 저장소에 둔다.
+installer/build/
+installer/dist/
+installer/*.spec
+
 # 산출물 · 시험 결과
 output/
 *.dxf

@@ -559,16 +559,22 @@ async def cad_version(request: Request, current: str = "", key: str = ""):
     """
     v = _version_info()
     latest = v.get("version", "")
+    files = v.get("files") or {}
+    # 판 번호를 주소에 붙인다. Cloudflare 는 주소가 같으면 네 시간을 캐시하므로,
+    # 이것이 없으면 새 판을 올려도 한동안 옛 파일이 내려간다.
+    tag = f"?v={latest}" if latest else ""
     out = {
         "version": latest,
         "date": v.get("date", ""),
         "notice": v.get("notice", ""),
-        "url": (v.get("files") or {}).get("lisp", "/dist/CADMAP.lsp"),
+        "url": files.get("lisp", "/dist/CADMAP.lsp") + tag,
+        "installer": files.get("installer", "/dist/install.exe") + tag,
         "site": config.SITE_URL,
         "update": bool(latest and current and _ver(latest) > _ver(current)),
         "required": bool(v.get("min_version") and current
                          and _ver(current) < _ver(v["min_version"])),
         "available": (DIST / "CADMAP.lsp").exists(),
+        "installer_ready": (DIST / "install.exe").exists(),
     }
     if key:
         out["license"] = licensing.check(key, (request.headers.get("x-machine") or "")[:120])
@@ -595,7 +601,9 @@ async def dist_file(name: str):
     # 버전 파일은 절대 캐시하면 안 된다. 나머지는 짧게만 둔다.
     cache = ("no-cache, must-revalidate" if f.name == "version.json"
              else "public, max-age=300")
-    media = {"json": "application/json", "lsp": "text/plain; charset=utf-8",
+    # 리습은 옛 AutoCAD 도 읽도록 cp949 로 배포한다. 그대로 알려 줘야
+    # 브라우저에서 열어 봐도 한글이 깨지지 않는다.
+    media = {"json": "application/json", "lsp": "text/plain; charset=euc-kr",
              "mnu": "text/plain; charset=utf-8", "exe": "application/octet-stream",
              "zip": "application/zip"}.get(f.suffix.lstrip(".").lower(),
                                            "application/octet-stream")
