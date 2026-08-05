@@ -281,3 +281,30 @@ def _rings_of(geom: dict) -> list[list[tuple[float, float]]]:
         for r in co:
             add(r)
     return rings
+
+
+async def props_at(client, lon: float, lat: float, layer: str,
+                   domain: str | None = None) -> list[dict]:
+    """그 점이 드는 도형의 속성만 가져온다. 도형은 받지 않는다.
+
+    토지이용계획은 "이 자리가 무엇에 걸리는가"만 알면 되므로, 도형을
+    빼고 속성만 받으면 훨씬 가볍다.
+    """
+    params = {
+        "service": "data", "request": "GetFeature", "data": layer,
+        "key": config.VWORLD_KEY,
+        "domain": domain or (config.VWORLD_DOMAINS[0] if config.VWORLD_DOMAINS else ""),
+        "format": "json", "crs": "EPSG:4326", "size": 10,
+        "geometry": "false", "attribute": "true",
+        "geomFilter": f"POINT({lon} {lat})",
+    }
+    try:
+        r = await client.get(config.VWORLD_DATA_URL, params=params)
+        body = r.json().get("response", {})
+    except Exception:                       # noqa: BLE001 — 하나 실패해도 나머지는 본다
+        return []
+    if body.get("status") != "OK":
+        return []
+    return [f.get("properties") or {} for f in
+            body.get("result", {}).get("featureCollection", {})
+                .get("features", [])]

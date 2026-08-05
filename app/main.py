@@ -430,6 +430,97 @@ async def license_auto(request: Request):
     return out
 
 
+# 토지이음의 필지별 토지이용계획 열람 주소. PNU 만 있으면 바로 열린다.
+EUM_URL = ("https://www.eum.go.kr/web/ar/lu/luLandDet.jsp"
+           "?mode=search&isNoScr=script&pnu={pnu}")
+
+
+@app.get("/api/eum")
+async def eum_link(lon: float, lat: float):
+    """클릭한 자리의 지번과 토지이음 열람 주소.
+
+    토지이용계획은 개별법 지역지구까지 얽혀 있어 우리가 모아 보여 주면
+    빠지는 것이 생긴다. 원본을 그대로 열어 주는 편이 정확하다.
+    """
+    if not config.VWORLD_KEY:
+        raise HTTPException(503, "V-World 인증키가 설정되지 않았습니다.")
+    async with httpx.AsyncClient(timeout=20.0,
+                                 headers={"User-Agent": config.USER_AGENT}) as c:
+        rows = await vworld.props_at(c, lon, lat, vworld.LAYER)
+    if not rows:
+        raise HTTPException(404, "이 지점에서 필지를 찾지 못했습니다. "
+                                 "바다나 미등록 지역일 수 있습니다.")
+    pr = rows[0]
+    pnu = (pr.get("pnu") or "").strip()
+    if not pnu:
+        raise HTTPException(404, "지번 번호(PNU)를 얻지 못했습니다.")
+    jibun, jimok = vworld._parse_jibun(pr.get("jibun") or "")
+    return {"pnu": pnu, "addr": (pr.get("addr") or "").strip(),
+            "jibun": jibun, "jimok": jimok,
+            "url": EUM_URL.format(pnu=pnu)}
+
+
+@app.get("/api/landuse")
+async def landuse(lon: float, lat: float):
+    """클릭한 자리의 토지이용계획.
+
+    지역지구 도형을 모두 다루고 있으므로 새로 받아 올 것이 없다. 그 점이
+    어느 도형 안에 드는지 한꺼번에 물어보면 된다. 45개를 함께 물어도
+    1초가 걸리지 않는다.
+    """
+    if not config.VWORLD_KEY:
+        raise HTTPException(503, "V-World 인증키가 설정되지 않았습니다.")
+
+    specs = layerdef.catalog()
+    async with httpx.AsyncClient(timeout=25.0,
+                                 headers={"User-Agent": config.USER_AGENT}) as c:
+        jobs_ = [vworld.props_at(c, lon, lat, vworld.LAYER)]
+        jobs_ += [vworld.props_at(c, lon, lat, s["source"]) for s in specs]
+        got = await asyncio.gather(*jobs_)
+
+    # 지번
+    parcel = {}
+    if got[0]:
+        pr = got[0][0]
+        jibun, jimok = vworld._parse_jibun(pr.get("jibun") or pr.get("addr") or "")
+        parcel = {"pnu": pr.get("pnu", ""), "jibun": jibun, "jimok": jimok,
+                  "addr": (pr.get("addr") or "").strip()}
+
+    # 걸리는 지역지구를 묶음별로
+    groups: dict[str, list] = {}
+    pairs = []
+    for spec, rows in zip(specs, got[1:]):
+        for pr in rows:
+            pairs.append((spec["key"], layerdef.name_of(spec, pr)))
+    colors = layerdef.color_map(pairs)
+
+    for spec, rows in zip(specs, got[1:]):
+        seen = []
+        for pr in rows:
+            kind = layerdef.name_of(spec, pr)
+            if kind in seen:
+                continue
+            seen.append(kind)
+            groups.setdefault(spec["group"], []).append({
+                "key": spec["key"], "label": spec["label"], "value": kind,
+                "color": _aci_hex(colors.get((spec["key"], kind), 7)),
+            })
+
+    try:
+        addr = await vworld.reverse_geocode(lon, lat)
+    except Exception:                       # noqa: BLE001
+        addr = {"parcel": None, "road": None}
+
+    return {
+        "lon": lon, "lat": lat, "address": addr, "parcel": parcel,
+        "groups": [{"group": g, "items": groups[g]}
+                   for g in layerdef.GROUPS if g in groups],
+        "count": sum(len(v) for v in groups.values()),
+        # V-World 에 없어 여기에 안 나오는 것. 있는 줄 알고 넘어가면 곤란하다.
+        "missing": [a for a, _ in layerdef.UNAVAILABLE],
+    }
+
+
 @app.get("/api/plan")
 async def plan_preview(bbox: str = Query(...), keys: str = ""):
     """지도에 도시계획선을 미리 그려 주기 위한 GeoJSON.

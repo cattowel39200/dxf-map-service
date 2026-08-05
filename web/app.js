@@ -1048,3 +1048,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const g = document.getElementById('planGroups');
   if (g) g.addEventListener('change', schedulePlan);
 }
+
+
+/* ── 토지이용계획 보기 — 토지이음에서 그 필지 페이지를 연다 ──
+   지역지구는 개별법까지 얽혀 있어 우리가 모아 보여 주면 빠지는 것이
+   생긴다. 원본을 그대로 열어 주는 편이 정확하다. */
+$('ctxEum').onclick = async () => {
+  if (!ctxPoint) return;
+  const { lon, lat } = ctxPoint;
+  ctxClose();
+  // 누른 그 자리에서 창을 먼저 연다. 기다렸다 열면 팝업 차단에 걸린다.
+  const w = window.open('', '_blank');
+  try {
+    const r = await fetch(`/api/eum?lon=${lon}&lat=${lat}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || '지번을 찾지 못했습니다.');
+    if (w) w.location.href = d.url;
+    else showError(`창을 열지 못했습니다. 팝업 차단을 풀어 주세요.  ${d.addr}`);
+  } catch (e) {
+    if (w) w.close();
+    showError(e.message);
+  }
+};
