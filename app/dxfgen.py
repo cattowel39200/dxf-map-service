@@ -3,6 +3,7 @@
 들어오는 좌표는 모두 EPSG:4326 경위도이고, 여기서 목표 좌표계로 변환한 뒤
 레이어별로 배치한다. 좌표 변환을 이 단계에 몰아두어 소스 모듈은 좌표계를 모른다.
 """
+import re
 from pathlib import Path
 
 import ezdxf
@@ -25,6 +26,22 @@ LAYERS = [
 ]
 
 TEXT_STYLE = "HANGUL"
+
+# 레이어 이름에 쓸 수 없는 글자. 제어문자까지 걸러 낸다.
+_BAD_LAYER_CHARS = re.compile(r'[<>/\\":;?*|,=`]|[\x00-\x1f]')
+
+
+def _plan_name(spec, props):
+    """도형의 종류 이름. 레이어마다 이름이 담긴 칸이 달라 앞에서부터 찾는다."""
+    for f in spec.get("fields") or ():
+        v = (props.get(f) or "").strip()
+        if v:
+            return v
+    return spec.get("label", "")
+
+
+def _safe_layer(name: str) -> str:
+    return re.sub(r"\s+", " ", _BAD_LAYER_CHARS.sub("", name)).strip()[:60]
 
 
 class DxfBuilder:
@@ -55,6 +72,8 @@ class DxfBuilder:
             if options.get("origin_shift") else (0.0, 0.0)
 
         self.counts = {}
+        # 도시계획처럼 그때그때 만든 레이어. 정리할 때 구분하려고 둔다.
+        self.made = set()
 
     # ── 문서 준비 ───────────────────────────────
     def _setup_header(self):
@@ -84,6 +103,17 @@ class DxfBuilder:
 
     def _bump(self, layer, n=1):
         self.counts[layer] = self.counts.get(layer, 0) + n
+
+    def _ensure_layer(self, name, color, desc=""):
+        """없으면 만든다. 도시계획은 종류가 수십 가지라 미리 다 만들지 않는다."""
+        if name not in self.doc.layers:
+            lay = self.doc.layers.add(name, color=color)
+            if desc:
+                lay.description = desc[:255]
+            if not self.r12:
+                lay.dxf.lineweight = 18
+        self.made.add(name)
+        return name
 
     # ── 도형 추가 ───────────────────────────────
     def _polyline(self, pts, layer, closed=False, elevation=None):
@@ -130,6 +160,41 @@ class DxfBuilder:
                     if jimok:
                         self._text(jimok, (cx, cy - th * 0.7), th * 0.85, "D-PNU-TEXT")
 
+    def add_planning(self, spec, shapes, sub_layers=True, draw_label=False):
+        """도시계획·지역지구 도형을 넣는다.
+
+        자료가 면(폴리곤)으로 오므로 테두리를 선으로 그린다. 도시계획선은
+        곧 그 면의 경계선이다.
+
+        sub_layers 를 켜면 종류마다 레이어를 나눈다. 도로를 예로 들면
+        UP-도로-중로2류 처럼 갈라져 등급별로 끄고 켜기 쉽다.
+        """
+        base, color = spec["layer"], spec["color"]
+        th = self._text_height()
+
+        for s in shapes:
+            kind = _plan_name(spec, s.get("props") or {})
+            layer = base
+            if sub_layers:
+                safe = _safe_layer(kind)
+                if safe:
+                    layer = f"{base}-{safe}"
+            self._ensure_layer(layer, color, f"{spec['label']} · {kind}")
+
+            first = None
+            for ring in s.get("rings") or []:
+                pts = self._pts(ring)
+                if len(pts) < 2:
+                    continue
+                if first is None:
+                    first = pts
+                self._polyline(pts, layer, closed=len(pts) >= 3)
+
+            if draw_label and kind and first and len(first) >= 3:
+                cx = sum(x for x, _ in first) / len(first)
+                cy = sum(y for _, y in first) / len(first)
+                self._text(kind, (cx, cy), th, layer)
+
     def add_reference_marks(self):
         """좌하단 기준점 십자와 방위표. 원점 이동을 켰을 때 특히 필요하다."""
         s = self.scale if not self.geographic else 1.0
@@ -172,7 +237,7 @@ class DxfBuilder:
     # ── 저장 ───────────────────────────────────
     def save(self, path: Path):
         # 빈 레이어는 CAD에서 지저분하므로 정리한다.
-        for name, *_ in LAYERS:
+        for name in [n for n, *_ in LAYERS] + sorted(self.made):
             if self.counts.get(name, 0) == 0 and name in self.doc.layers:
                 try:
                     self.doc.layers.remove(name)
@@ -183,7 +248,8 @@ class DxfBuilder:
 
     def stats(self):
         desc = {n: d for n, _c, _l, d in LAYERS}
+        names = [n for n, *_ in LAYERS] + sorted(self.made)
         return [
-            {"layer": n, "name": desc[n], "count": self.counts[n]}
-            for n, *_ in LAYERS if self.counts.get(n, 0)
+            {"layer": n, "name": desc.get(n, n), "count": self.counts[n]}
+            for n in names if self.counts.get(n, 0)
         ]

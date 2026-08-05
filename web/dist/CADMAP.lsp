@@ -26,14 +26,16 @@
 ;; 서버 주소 고정 (로드 시마다 강제 설정)
 (setq *cm:server* "https://ks-down-map.com")
 (if (not *cm:crs*)      (setq *cm:crs*      "5187"))
-;; 지적도 전용 (필지경계+지번지목)
-(setq *cm:layers* "parcel,pnu")
+;; 받을 자료. 기본은 지적도만. 설정창에서 도시계획·지역지구를 더할 수 있다.
+(if (not *cm:layers*) (setq *cm:layers* "parcel,pnu"))
+;; 서버에서 받아 둔 자료 목록 ( (키 이름 묶음) ... )
+(setq *cm:cat* nil)
 (if (not *cm:interval*) (setq *cm:interval* 5.0))
 (if (not *cm:explode*)  (setq *cm:explode*  T))
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.3.0")
+(setq *cm:version* "1.4.0")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -110,6 +112,11 @@
     "      : text { key = \"tcoln\"; label = \"\"; width = 11; }"
     "    }"
     "  }"
+    "  : boxed_row {"
+    "    label = \"받을 자료\";"
+    "    : text { key = \"lay\"; label = \"\"; width = 40; }"
+    "    : button { key = \"laybtn\"; label = \"고르기\"; width = 10; }"
+    "  }"
     "  : text { key = \"note\"; label = \"\"; width = 46; }"
     "  : row {"
     "    : button { key = \"accept\"; label = \"영역선택\"; is_default = true; width = 14; }"
@@ -134,7 +141,9 @@
       (set_tile "tlyr"  *cm:tlyr*)
       (set_tile "tsize" (rtos *cm:tsize* 2 2))
       (set_tile "note"  (cm:n licnote ""))
+      (set_tile "lay"   (cm:laysummary))
 
+      (action_tile "laybtn" "(if (cm:laydlg) (set_tile \"lay\" (cm:laysummary)))")
       (action_tile "pcol" "(cm:pickpcol)")
       (action_tile "tcol" "(cm:picktcol)")
       (action_tile "accept"
@@ -241,6 +250,171 @@
   (if (and *cm:tstyle* (not (member *cm:tstyle* out)))
     (setq out (cons *cm:tstyle* out)))
   (if out out (list "Standard")))
+
+;; --------------------------------------------------------------- 자료 목록
+;; 서버가 한 줄에 하나씩 "키|이름|묶음" 으로 준다. AutoLISP 으로 JSON 을
+;; 파헤치는 것은 깨지기 쉬워, 나눠 읽기만 하면 되는 형태로 받는다.
+(defun cm:split (s sep / out cur i ch)
+  (setq out '() cur "" i 0)
+  (repeat (strlen s)
+    (setq i (1+ i) ch (substr s i 1))
+    (if (= ch sep)
+      (setq out (cons cur out) cur "")
+      (setq cur (strcat cur ch))))
+  (reverse (cons cur out)))
+
+(defun cm:fetchcat ( / res txt rows row out)
+  (if *cm:cat*
+    *cm:cat*
+    (progn
+      (setq res (cm:http "GET" (strcat *cm:server* "/api/layers?format=text") nil)
+            txt (cadr res))
+      (if (null txt)
+        nil
+        (progn
+          (setq out '())
+          (foreach l (cm:split txt "\n")
+            (setq row (cm:split l "|"))
+            (if (and (= (length row) 3) (/= (car row) ""))
+              (setq out (cons row out))))
+          (setq *cm:cat* (reverse out)))))))
+
+(defun cm:member (k lst) (if (member k lst) T nil))
+
+;; 고른 키 목록 (글자) -> 목록
+(defun cm:picked ( / )
+  (vl-remove-if '(lambda (s) (= s ""))
+    (mapcar '(lambda (s) (cm:strip s)) (cm:split *cm:layers* ","))))
+
+(defun cm:setpicked (lst)
+  (setq *cm:layers*
+    (if lst
+      (substr (apply 'strcat (mapcar '(lambda (k) (strcat "," k)) lst)) 2)
+      ""))
+  *cm:layers*)
+
+(defun cm:laydlg ( / p id res cat groups gi rows sel cur)
+  (setq cat (cm:fetchcat))
+  (if (null cat)
+    (progn (alert "자료 목록을 받지 못했습니다.\n인터넷 연결을 확인해 주세요.") nil)
+    (progn
+      (setq groups '())
+      (foreach r cat
+        (if (not (member (caddr r) groups)) (setq groups (cons (caddr r) groups))))
+      (setq groups (reverse groups))
+      (setq *cm:grp* (car groups))
+      (setq *cm:sel* (cm:picked))
+
+      (setq p (cm:dcl (list
+        "cm_lay : dialog {"
+        "  label = \"받을 자료 고르기\";"
+        "  : row {"
+        "    : boxed_column {"
+        "      label = \"묶음\";"
+        "      : list_box { key = \"grp\"; width = 16; height = 15; }"
+        "    }"
+        "    : boxed_column {"
+        "      label = \"종류 (여러 개 고르실 수 있습니다)\";"
+        "      : list_box { key = \"lst\"; width = 32; height = 15; multiple_select = true; }"
+        "    }"
+        "  }"
+        "  : text { key = \"cnt\"; label = \"\"; width = 52; }"
+        "  : row {"
+        "    : button { key = \"allb\";   label = \"이 묶음 모두\"; width = 14; }"
+        "    : button { key = \"noneb\";  label = \"모두 해제\";   width = 12; }"
+        "    : button { key = \"accept\"; label = \"확인\"; is_default = true; width = 10; }"
+        "    : button { key = \"cancel\"; label = \"취소\"; is_cancel = true; width = 10; }"
+        "  }"
+        "}")))
+
+      (setq id (load_dialog p) res nil)
+      (if (and (>= id 0) (new_dialog "cm_lay" id))
+        (progn
+          (start_list "grp") (foreach g groups (add_list g)) (end_list)
+          (set_tile "grp" "0")
+          (cm:fill_lst)
+          (action_tile "grp"
+            (strcat "(setq *cm:grp* (nth (atoi $value) '("
+                    (cm:strs groups) ")))(cm:fill_lst)"))
+          (action_tile "lst" "(cm:take_lst $value)")
+          (action_tile "allb"  "(cm:all_lst T)")
+          (action_tile "noneb" "(cm:all_lst nil)")
+          (action_tile "accept" "(done_dialog 1)")
+          (action_tile "cancel" "(done_dialog 0)")
+          (setq res (start_dialog))))
+      (if (>= id 0) (unload_dialog id))
+      (vl-file-delete p)
+
+      (if (= res 1)
+        (progn
+          (cm:setpicked *cm:sel*)
+          (cm:regput "Layers" *cm:layers*)
+          T)
+        nil))))
+
+;; 지금 묶음에 속한 것만 목록에 올리고, 고른 것을 표시해 둔다
+(defun cm:fill_lst ( / rows idx i)
+  (setq *cm:rows* (vl-remove-if-not
+                    '(lambda (r) (= (caddr r) *cm:grp*)) *cm:cat*))
+  (start_list "lst")
+  (foreach r *cm:rows*
+    (add_list (strcat (if (cm:member (car r) *cm:sel*) "[V] " "[  ] ")
+                      (cadr r))))
+  (end_list)
+  (setq idx "" i -1)
+  (foreach r *cm:rows*
+    (setq i (1+ i))
+    (if (cm:member (car r) *cm:sel*)
+      (setq idx (strcat idx (if (= idx "") "" " ") (itoa i)))))
+  (set_tile "lst" idx)
+  (cm:show_cnt)
+  (princ))
+
+;; 목록에서 고른 자리를 키 목록으로 옮긴다
+(defun cm:take_lst (val / keep i)
+  ;; 다른 묶음에서 고른 것은 그대로 두고, 이 묶음 것만 새로 담는다
+  (setq keep (vl-remove-if
+               '(lambda (k)
+                  (vl-some '(lambda (r) (= (car r) k)) *cm:rows*))
+               *cm:sel*))
+  (foreach s (cm:split val " ")
+    (if (/= s "")
+      (progn
+        (setq i (atoi s))
+        (if (< i (length *cm:rows*))
+          (setq keep (cons (car (nth i *cm:rows*)) keep))))))
+  (setq *cm:sel* keep)
+  (cm:show_cnt)
+  (princ))
+
+(defun cm:all_lst (on / )
+  (if on
+    (foreach r *cm:rows*
+      (if (not (cm:member (car r) *cm:sel*))
+        (setq *cm:sel* (cons (car r) *cm:sel*))))
+    (setq *cm:sel* nil))
+  (cm:fill_lst)
+  (princ))
+
+(defun cm:show_cnt ( / )
+  (set_tile "cnt"
+    (if *cm:sel*
+      (strcat "  고른 자료 " (itoa (length *cm:sel*)) " 종")
+      "  고른 자료가 없습니다. 하나 이상 골라 주세요."))
+  (princ))
+
+;; 설정창에 보여 줄 요약
+(defun cm:laysummary ( / n cat lab)
+  (setq n (length (cm:picked)) cat (cm:fetchcat) lab "")
+  (foreach k (cm:picked)
+    (if (< (strlen lab) 40)
+      (foreach r cat
+        (if (= (car r) k)
+          (setq lab (strcat lab (if (= lab "") "" ", ") (cadr r))))))
+    )
+  (if (= n 0) "  고른 자료 없음"
+    (strcat "  " (itoa n) "종   " (substr lab 1 44)
+            (if (> (strlen lab) 44) "…" ""))))
 
 ;; --------------------------------------------------------------- 색 고르기
 ;; 색 이름을 글자로 늘어놓는 대신, AutoCAD 색상표를 그대로 띄운다.
@@ -480,6 +654,7 @@
   (cm:regput "TCol"   *cm:tcol*)
   (cm:regput "TSize"  (rtos *cm:tsize* 2 4))
   (cm:regput "TStyle" *cm:tstyle*)
+  (cm:regput "Layers" *cm:layers*)
   T)
 
 (defun cm:load ( / v)
@@ -493,6 +668,7 @@
         *cm:tstyle* (cm:regget "TStyle" *cm:tstyle*))
   (setq *cm:tsize* (cm:posnum (cm:regget "TSize" "") *cm:tsize*))
   (setq *cm:ct* (cm:regget "Contact" ""))
+  (setq *cm:layers* (cm:regget "Layers" *cm:layers*))
   ;; 삽입한 것을 후처리해야 하므로 분해는 늘 한다.
   (setq *cm:explode* T)
   T)
@@ -698,11 +874,22 @@
       "   1. 메뉴 [지적도] - [지적도삽입] 을 누릅니다."
       "   2. 출력 좌표계를 고릅니다."
       "      지금 도면의 좌표계와 반드시 같아야 위치가 맞습니다."
-      "   3. 필지선과 지번 글자의 레이어명·색상·크기·스타일을 정합니다."
-      "   4. [영역선택] 을 누르고 화면에서 두 점을 찍습니다."
-      "   5. 1~3분 뒤 도면에 들어오고, 정한 레이어로 자동 정리됩니다."
-      "   6. 설정창이 다시 열립니다. 이어서 다른 곳도 받으실 수 있습니다."
+      "   3. [받을 자료 - 고르기] 에서 무엇을 받을지 정합니다."
+      "      지적도 · 도시계획시설 · 용도지역 · 용도지구 · 용도구역 ·"
+      "      개별법령 지역지구를 묶음별로 고르실 수 있습니다."
+      "      도시계획 자료는 종류마다 레이어가 갈려 들어옵니다."
+      "      (보기)  UP-도로-중로2류,  UQ-도시지역-일반상업지역"
+      "   4. 필지선과 지번 글자의 레이어명·색상·크기·스타일을 정합니다."
+      "   5. [영역선택] 을 누르고 화면에서 두 점을 찍습니다."
+      "   6. 1~3분 뒤 도면에 들어오고, 정한 레이어로 자동 정리됩니다."
+      "   7. 설정창이 다시 열립니다. 이어서 다른 곳도 받으실 수 있습니다."
       "      그만하시려면 [닫기] 를 누르십시오."
+      ""
+      "■ 도시계획 자료에 대하여"
+      "   국토교통부 V-World 가 주는 자료를 그대로 옮겨 드립니다."
+      "   시군구가 올린 만큼만 있어, 지역에 따라 없는 종류가 있습니다."
+      "   원본은 지자체 고시도면이고 이 자료는 반영이 늦을 수 있으므로,"
+      "   인허가에 쓰실 때에는 반드시 고시도면을 확인하십시오."
       ""
       "■ 설정은 저장됩니다"
       "   레이어명·색상·글자크기·스타일·좌표계는 이 PC 에 남습니다."
@@ -1362,6 +1549,8 @@
   (cond
     ((not p2) (cm:msg "영역 선택을 취소했습니다."))
     (T
+     (if (null (cm:picked))
+       (progn (alert "받을 자료를 하나 이상 골라 주세요.") (setq p2 nil)))
      (setq x0 (min (car p1) (car p2))   x1 (max (car p1) (car p2))
            y0 (min (cadr p1) (cadr p2)) y1 (max (cadr p1) (cadr p2))
            w  (- x1 x0)  h (- y1 y0)

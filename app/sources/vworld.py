@@ -124,7 +124,7 @@ async def reverse_geocode(lon: float, lat: float) -> dict:
     raise VWorldError(f"주소를 가져오지 못했습니다: {last or '알 수 없는 오류'}")
 
 
-async def _get_page(client, box, page, domains):
+async def _get_page(client, box, page, domains, layer=LAYER):
     """등록된 도메인을 찾을 때까지 순서대로 시도한다.
 
     성공한 도메인을 목록 맨 앞으로 올려 돌려주므로 다음 페이지부터는 한 번에 된다.
@@ -134,7 +134,7 @@ async def _get_page(client, box, page, domains):
         params = {
             "service": "data",
             "request": "GetFeature",
-            "data": LAYER,
+            "data": layer,
             "key": config.VWORLD_KEY,
             "domain": dom,
             "format": "json",
@@ -194,3 +194,86 @@ def _feature_to_parcel(feature):
         "jimok": jimok,
         "rings": rings,
     }
+
+
+# ── 도시계획·지역지구 조회 ─────────────────────────────────────
+async def fetch_shapes(box: BBox, layer: str, progress=None) -> list[dict]:
+    """레이어 하나를 통째로 받아 [{props, rings}] 로 돌려준다.
+
+    지적도와 달리 종류가 수십 가지라 속성을 그대로 넘긴다. 어느 칸이
+    이름인지는 부르는 쪽(layers.py)이 안다.
+
+    도형은 대부분 MultiPolygon 이다. 도시계획선은 그 면의 테두리이므로
+    바깥·안쪽 고리를 모두 그대로 담아 준다.
+    """
+    if not config.VWORLD_KEY:
+        raise VWorldError("V-World 인증키가 없습니다.")
+
+    out: list[dict] = []
+    page = 1
+    total = None
+    domains = list(config.VWORLD_DOMAINS)
+
+    async with httpx.AsyncClient(timeout=config.HTTP_TIMEOUT,
+                                 headers={"User-Agent": config.USER_AGENT}) as client:
+        while page <= config.VWORLD_MAX_PAGES:
+            body, domains = await _get_page(client, box, page, domains, layer)
+            status = body.get("status")
+
+            # 그 지역에 자료가 없는 것은 잘못이 아니다. 빈 채로 넘어간다.
+            if status == "NOT_FOUND":
+                break
+            if status != "OK":
+                msg = body.get("error", {}).get("text") or status or "알 수 없는 오류"
+                raise VWorldError(f"{layer}: {msg}")
+
+            feats = (body.get("result", {}).get("featureCollection", {})
+                     .get("features", []))
+            if not feats:
+                break
+
+            for f in feats:
+                rings = _rings_of(f.get("geometry") or {})
+                if rings:
+                    out.append({"props": f.get("properties") or {}, "rings": rings})
+
+            if total is None:
+                try:
+                    total = int(body.get("record", {}).get("total", 0))
+                except (TypeError, ValueError):
+                    total = len(feats)
+            if progress and total:
+                progress(min(1.0, len(out) / total))
+
+            if len(out) >= (total or 0) or len(feats) < config.VWORLD_PAGE_SIZE:
+                break
+            page += 1
+
+    return out
+
+
+def _rings_of(geom: dict) -> list[list[tuple[float, float]]]:
+    """Polygon · MultiPolygon · LineString 을 고리 목록으로 편다."""
+    kind = geom.get("type")
+    co = geom.get("coordinates") or []
+    rings: list[list[tuple[float, float]]] = []
+
+    def add(seq):
+        pts = [(float(p[0]), float(p[1])) for p in seq
+               if isinstance(p, (list, tuple)) and len(p) >= 2]
+        if len(pts) >= 2:
+            rings.append(pts)
+
+    if kind == "Polygon":
+        for r in co:
+            add(r)
+    elif kind == "MultiPolygon":
+        for poly in co:
+            for r in poly:
+                add(r)
+    elif kind == "LineString":
+        add(co)
+    elif kind == "MultiLineString":
+        for r in co:
+            add(r)
+    return rings

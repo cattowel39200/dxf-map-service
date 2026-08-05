@@ -10,13 +10,14 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, usage
+from . import config, layers as layerdef, usage
 from .dxfgen import DxfBuilder
 from .geom import BBox
 from .sources import vworld
 
 STAGES = [
     ("parcel", "연속지적도 필지 조회"),
+    ("planning", "도시계획 · 지역지구 조회"),
     ("assemble", "좌표 변환 및 DXF 조립"),
 ]
 
@@ -94,26 +95,59 @@ async def _run(job: Job, req: dict):
         options = req.get("options", {})
         target = req["crs"]
 
-        # 1) 연속지적도 조회
-        job.stage = "parcel"
-        job.progress = 0.03
-        parcels = await vworld.fetch_parcels(
-            box, progress=lambda p: setattr(job, "stage_progress", max(0.0, min(1.0, p))))
-        job.stage_progress = 1.0
-        job.parcel_count = len(parcels)
+        want_cadastral = bool({"parcel", "pnu"} & set(layers))
+        plans = layerdef.pick(layers)
 
-        if not parcels:
+        # 1) 연속지적도 조회
+        parcels = []
+        if want_cadastral:
+            job.stage = "parcel"
+            job.progress = 0.03
+            parcels = await vworld.fetch_parcels(
+                box,
+                progress=lambda p: setattr(job, "stage_progress",
+                                           max(0.0, min(1.0, p))))
+            job.stage_progress = 1.0
+            job.parcel_count = len(parcels)
+
+            if not parcels and not plans:
+                raise RuntimeError(
+                    "선택한 영역에서 필지를 찾지 못했습니다. "
+                    "바다나 미등록 지역이거나, 영역이 너무 좁을 수 있습니다."
+                )
+
+        # 2) 도시계획 · 지역지구 조회
+        # 그 지역에 없는 종류는 빈 채로 넘어간다. 한 종류가 없다고 해서
+        # 나머지까지 못 받게 하면 쓸모가 없다.
+        shapes = {}
+        if plans:
+            job.stage = "planning"
+            job.progress = 0.25
+            job.stage_progress = 0.0
+            for i, spec in enumerate(plans):
+                try:
+                    got = await vworld.fetch_shapes(box, spec["source"])
+                except Exception as exc:      # noqa: BLE001
+                    got = []
+                    job.warnings.append(f"{spec['label']}: {exc}")
+                if got:
+                    shapes[spec["key"]] = got
+                else:
+                    job.warnings.append(f"{spec['label']}: 이 영역에는 자료가 없습니다.")
+                job.stage_progress = (i + 1) / len(plans)
+
+        if not parcels and not shapes:
             raise RuntimeError(
-                "선택한 영역에서 필지를 찾지 못했습니다. "
-                "바다나 미등록 지역이거나, 영역이 너무 좁을 수 있습니다."
+                "선택한 영역에서 받을 자료가 없습니다. "
+                "다른 종류를 고르시거나 영역을 옮겨 보세요."
             )
 
-        # 2) 좌표 변환 + 조립 — CPU 작업이라 이벤트 루프를 막지 않게 스레드로 뺀다.
+        # 3) 좌표 변환 + 조립 — CPU 작업이라 이벤트 루프를 막지 않게 스레드로 뺀다.
         job.stage = "assemble"
-        job.progress = 0.6
+        job.progress = 0.7
         job.stage_progress = 0.0
         result = await asyncio.to_thread(
-            _assemble, job.id, box, target, options, layers, parcels)
+            _assemble, job.id, box, target, options, layers, parcels, shapes)
         job.path, job.filename, job.size, job.layers = result
         job.progress = 1.0
         job.stage_progress = 1.0
@@ -127,11 +161,18 @@ async def _run(job: Job, req: dict):
         _log_usage(job, req)
 
 
-def _assemble(job_id, box, target, options, layers, parcels):
+def _assemble(job_id, box, target, options, layers, parcels, shapes=None):
     b = DxfBuilder(target, options, box)
-    b.add_parcels(parcels,
-                  draw_boundary="parcel" in layers,
-                  draw_label="pnu" in layers)
+    if parcels:
+        b.add_parcels(parcels,
+                      draw_boundary="parcel" in layers,
+                      draw_label="pnu" in layers)
+    for spec in layerdef.pick(layers):
+        got = (shapes or {}).get(spec["key"])
+        if got:
+            b.add_planning(spec, got,
+                           sub_layers=options.get("plan_sub_layers", True),
+                           draw_label=options.get("plan_labels", False))
     if options.get("reference_marks", True):
         b.add_reference_marks()
 

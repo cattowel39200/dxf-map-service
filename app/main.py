@@ -15,13 +15,14 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, crs, jobs, licensing, mailer, notices, purchases, usage
+from . import (config, crs, jobs, layers as layerdef, licensing, mailer,
+               notices, purchases, usage)
 from .geom import BBox
 from .sources import vworld
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
-VALID_LAYERS = {"parcel", "pnu"}
+VALID_LAYERS = {"parcel", "pnu"} | set(layerdef.KEYS)
 TILE_LAYERS = {"Base": "png", "gray": "png", "midnight": "png",
                "Satellite": "jpeg", "Hybrid": "png"}
 
@@ -427,6 +428,35 @@ async def license_auto(request: Request):
     if not out.get("ok"):
         raise HTTPException(400, out.get("reason", "발급하지 못했습니다."))
     return out
+
+
+@app.get("/api/layers")
+async def layer_catalog(format: str = "json"):
+    """받을 수 있는 자료 목록. 웹 화면과 리습이 이 목록으로 메뉴를 만든다.
+
+    리습에는 한 줄에 하나씩 적은 글로 준다. AutoLISP 으로 중첩된 JSON 을
+    파헤치는 것은 깨지기 쉬워, 나눠 읽기만 하면 되는 형태가 안전하다.
+    """
+    if format == "text":
+        rows = ["parcel|필지 경계|지적도", "pnu|지번 지목|지적도"]
+        rows += [f"{c['key']}|{c['label']}|{c['group']}" for c in layerdef.catalog()]
+        # 리습이 읽을 것이므로 cp949 로 직접 인코딩한다. 글자만 넘기면
+        # FastAPI 가 UTF-8 로 내보내면서 charset 만 euc-kr 이라 적어 깨진다.
+        body = ("\n".join(rows) + "\n").replace("·", "-")
+        return Response(body.encode("cp949", errors="replace"),
+                        media_type="text/plain; charset=euc-kr")
+    return {
+        "cadastral": [
+            {"key": "parcel", "label": "필지 경계", "group": "지적도",
+             "layer": "D-PARCEL"},
+            {"key": "pnu", "label": "지번 · 지목", "group": "지적도",
+             "layer": "D-PNU-TEXT"},
+        ],
+        "groups": list(layerdef.GROUPS),
+        "layers": layerdef.catalog(),
+        # V-World 에 없어 못 넣은 것. 물어보시기 전에 밝혀 둔다.
+        "unavailable": [{"label": a, "law": b} for a, b in layerdef.UNAVAILABLE],
+    }
 
 
 # ── 정품 구매 신청 (리습이 부른다) ────────────────────────
