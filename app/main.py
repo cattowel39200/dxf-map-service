@@ -535,6 +535,74 @@ async def cad_page():
     return _serve_page("cad.html")
 
 
+# ── 리습 배포 ─────────────────────────────────────────────
+DIST = WEB / "dist"
+
+
+def _version_info() -> dict:
+    f = DIST / "version.json"
+    if not f.exists():
+        return {}
+    try:
+        import json
+        return json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+@app.get("/api/cad/version")
+async def cad_version(request: Request, current: str = "", key: str = ""):
+    """리습이 시작할 때 하루 한 번 부른다. 새 버전이 있으면 알려 준다.
+
+    발급키를 함께 보내면 라이선스 상태도 같이 돌려주므로, 리습이 요청을
+    한 번만 하고도 업데이트와 사용 가능 여부를 동시에 알 수 있다.
+    """
+    v = _version_info()
+    latest = v.get("version", "")
+    out = {
+        "version": latest,
+        "date": v.get("date", ""),
+        "notice": v.get("notice", ""),
+        "url": (v.get("files") or {}).get("lisp", "/dist/CADMAP.lsp"),
+        "site": config.SITE_URL,
+        "update": bool(latest and current and _ver(latest) > _ver(current)),
+        "required": bool(v.get("min_version") and current
+                         and _ver(current) < _ver(v["min_version"])),
+        "available": (DIST / "CADMAP.lsp").exists(),
+    }
+    if key:
+        out["license"] = licensing.check(key, (request.headers.get("x-machine") or "")[:120])
+    return out
+
+
+def _ver(s: str) -> tuple:
+    """'1.10.2' 를 비교 가능한 형태로. 자리수가 달라도 올바르게 비교된다."""
+    parts = []
+    for chunk in str(s).split("."):
+        digits = "".join(ch for ch in chunk if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts + [0] * (4 - len(parts)))[:4]
+
+
+@app.get("/dist/{name:path}")
+async def dist_file(name: str):
+    """배포 파일. 폴더에 복사만 하면 바로 받아진다."""
+    if not name or ".." in name or name.startswith(("/", "\\")):
+        raise HTTPException(404, "없는 파일입니다.")
+    f = (DIST / name).resolve()
+    if not str(f).startswith(str(DIST.resolve())) or not f.is_file():
+        raise HTTPException(404, "없는 파일입니다.")
+    # 버전 파일은 절대 캐시하면 안 된다. 나머지는 짧게만 둔다.
+    cache = ("no-cache, must-revalidate" if f.name == "version.json"
+             else "public, max-age=300")
+    media = {"json": "application/json", "lsp": "text/plain; charset=utf-8",
+             "mnu": "text/plain; charset=utf-8", "exe": "application/octet-stream",
+             "zip": "application/zip"}.get(f.suffix.lstrip(".").lower(),
+                                           "application/octet-stream")
+    return FileResponse(f, media_type=media, filename=f.name,
+                        headers={"Cache-Control": cache})
+
+
 @app.get("/admin")
 async def admin_page():
     return _serve_page("admin.html")

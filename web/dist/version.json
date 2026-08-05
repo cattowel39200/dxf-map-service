@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "date": "2026-08-05",
+  "notice": "첫 배포입니다.",
+  "min_version": "1.0.0",
+  "files": {
+    "lisp": "/dist/CADMAP.lsp",
+    "installer": "/dist/install.exe",
+    "menu": "/dist/지적도.mnu"
+  }
+}

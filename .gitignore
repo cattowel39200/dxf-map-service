@@ -13,6 +13,10 @@ __pycache__/
 # 사용 기록 DB (운영 데이터)
 data/
 
+# 배포 바이너리는 저장소에 넣지 않는다(용량). 서버 디스크에만 둔다.
+web/dist/*.exe
+web/dist/*.zip
+
 # 산출물 · 시험 결과
 output/
 *.dxf
