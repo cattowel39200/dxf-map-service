@@ -33,7 +33,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.1.0")
+(setq *cm:version* "1.1.1")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -109,7 +109,7 @@
     "      : popup_list { key = \"tcol\"; label = \"색상\";     width = 13; }"
     "    }"
     "  }"
-    "  : text { key = \"note\"; label = \"\"; }"
+    "  : text { key = \"note\"; label = \"\"; width = 46; }"
     "  : row {"
     "    : button { key = \"accept\"; label = \"영역선택\"; is_default = true; width = 14; }"
     "    : button { key = \"cancel\"; label = \"닫기\"; is_cancel = true; width = 14; }"
@@ -772,15 +772,15 @@
         "    : spacer { height = 0.4; }"
         "    : text { label = \"입금하실 때 [보내는 분] 이름 자리에\"; }"
         "    : text { label = \"아래 PC 번호를 그대로 넣어 주십시오.\"; }"
-        "    : text { key = \"pc\"; label = \"\"; }"
+        "    : edit_box { key = \"pc\"; label = \"PC 번호\"; edit_width = 26; }"
         "  }"
         "  : boxed_column {"
         "    label = \"세금계산서\";"
         "    : toggle { key = \"want\"; label = \"세금계산서를 받겠습니다\"; }"
-        "    : text { key = \"biz\"; label = \"\"; }"
+        "    : text { key = \"biz\"; label = \"\"; width = 46; }"
         "    : button { key = \"bizbtn\"; label = \"사업자 정보 적기\"; width = 20; }"
         "  }"
-        "  : text { key = \"state\"; label = \"\"; }"
+        "  : text { key = \"state\"; label = \"\"; width = 52; }"
         "  : row {"
         "    : button { key = \"accept\"; label = \"정품 신청하기\"; is_default = true; width = 18; }"
         "    : button { key = \"cancel\"; label = \"닫기\"; is_cancel = true; width = 12; }"
@@ -790,7 +790,7 @@
       (setq id (load_dialog p) res nil)
       (if (and (>= id 0) (new_dialog "cm_buy" id))
         (progn
-          (set_tile "pc" (strcat "        PC 번호   " (cm:machine)))
+          (set_tile "pc" (cm:machine))
           (set_tile "want" (if *cm:want* "1" "0"))
           (set_tile "biz" (cm:bizsummary))
           (set_tile "state"
@@ -847,11 +847,11 @@
     "  label = \"정보\";"
     "  : boxed_column {"
     "    label = \"지적도 DXF 가져오기\";"
-    "    : text { key = \"ver\"; label = \"\"; }"
-    "    : text { key = \"key\"; label = \"\"; }"
-    "    : text { key = \"pc\";  label = \"\"; }"
-    "    : text { key = \"st\";  label = \"\"; }"
-    "    : text { key = \"srv\"; label = \"\"; }"
+    "    : text     { key = \"ver\"; label = \"\"; width = 44; }"
+    "    : edit_box { key = \"key\"; label = \"발급키 \"; edit_width = 22; }"
+    "    : edit_box { key = \"pc\";  label = \"PC 번호\"; edit_width = 22; }"
+    "    : text     { key = \"st\";  label = \"\"; width = 44; }"
+    "    : text     { key = \"srv\"; label = \"\"; width = 44; }"
     "  }"
     "  : boxed_column {"
     "    label = \"만든 곳\";"
@@ -867,13 +867,11 @@
   (setq id (load_dialog p) res nil)
   (if (and (>= id 0) (new_dialog "cm_abt" id))
     (progn
-      (set_tile "ver" (strcat "판 번호    " *cm:version*))
-      (set_tile "key" (strcat "발급키     " (if (= (cm:n *cm:key* "") "")
-                                             "없음" *cm:key*)))
-      (set_tile "pc"  (strcat "PC 번호    " (cm:machine)))
-      (set_tile "st"  (strcat "상 태      "
-                              (if (car lic) (cdr lic) (cdr lic))))
-      (set_tile "srv" (strcat "서 버      " *cm:server*))
+      (set_tile "ver" (strcat "판 번호   " *cm:version*))
+      (set_tile "key" (if (= (cm:n *cm:key* "") "") "없음" *cm:key*))
+      (set_tile "pc"  (cm:machine))
+      (set_tile "st"  (strcat "상 태     " (cdr lic)))
+      (set_tile "srv" (strcat "서 버     " *cm:server*))
       (action_tile "upd"    "(done_dialog 2)")
       (action_tile "keyb"   "(done_dialog 3)")
       (action_tile "accept" "(done_dialog 0)")
