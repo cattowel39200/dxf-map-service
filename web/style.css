@@ -274,6 +274,26 @@ button{font:inherit;color:inherit}
 .mini-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 .laygroup + .laygroup{margin-top:14px}
+
+/* 도시계획 · 지역지구 묶음 */
+#planGroups{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+.plangrp{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.plangrp > summary{list-style:none;cursor:pointer;padding:8px 10px;display:flex;
+  align-items:center;gap:8px;font-size:12px;font-weight:600;user-select:none}
+.plangrp > summary::-webkit-details-marker{display:none}
+.plangrp > summary::before{content:"▸";font-size:10px;color:var(--text-3);
+  transition:transform .15s}
+.plangrp[open] > summary::before{transform:rotate(90deg)}
+.plangrp > summary:hover{background:var(--sunken)}
+.plangrp .cnt{margin-left:auto;font-family:var(--mono);font-size:10px;
+  color:var(--text-3);font-weight:400}
+.plangrp .cnt.on{color:var(--accent-hi);font-weight:600}
+.plangrp .body{padding:2px 6px 8px}
+.plangrp .all{font-size:10.5px;color:var(--text-3);background:none;border:0;
+  cursor:pointer;padding:3px 6px;text-decoration:underline}
+.plangrp .all:hover{color:var(--accent-hi)}
+.planhelp{font-size:10.5px;color:var(--text-3);line-height:1.6;margin:10px 0 0}
+.planhelp b{color:var(--text-2)}
 .laygroup-t{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:9.5px;
   letter-spacing:.13em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px}
 .laygroup-t::after{content:"";flex:1;height:1px;background:var(--line-soft)}

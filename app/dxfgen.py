@@ -27,6 +27,14 @@ LAYERS = [
 
 TEXT_STYLE = "HANGUL"
 
+# 종류마다 다른 색을 준다. 도면에 겹쳐 놓고 보아야 하므로 서로 잘 갈리는
+# 것만 골랐다. 글자는 레이어 색을 따르므로 선과 저절로 같은 색이 된다.
+PLAN_COLORS = [
+    1, 3, 5, 2, 4, 6, 30, 130, 90, 50, 170, 210, 20, 110, 70, 190, 230, 150,
+    40, 140, 60, 160, 80, 180, 100, 200, 120, 220, 10, 250, 34, 84, 134, 184,
+    214, 24, 74, 124, 174, 224, 44, 94, 144, 194, 244, 14, 64, 114, 164, 204,
+]
+
 # 레이어 이름에 쓸 수 없는 글자. 제어문자까지 걸러 낸다.
 _BAD_LAYER_CHARS = re.compile(r'[<>/\\":;?*|,=`]|[\x00-\x1f]')
 
@@ -74,6 +82,8 @@ class DxfBuilder:
         self.counts = {}
         # 도시계획처럼 그때그때 만든 레이어. 정리할 때 구분하려고 둔다.
         self.made = set()
+        # 도시계획 레이어에 돌아가며 줄 색의 차례
+        self._cidx = 0
 
     # ── 문서 준비 ───────────────────────────────
     def _setup_header(self):
@@ -104,9 +114,16 @@ class DxfBuilder:
     def _bump(self, layer, n=1):
         self.counts[layer] = self.counts.get(layer, 0) + n
 
-    def _ensure_layer(self, name, color, desc=""):
-        """없으면 만든다. 도시계획은 종류가 수십 가지라 미리 다 만들지 않는다."""
+    def _ensure_layer(self, name, color=None, desc=""):
+        """없으면 만든다. 도시계획은 종류가 수십 가지라 미리 다 만들지 않는다.
+
+        색을 주지 않으면 목록에서 차례대로 뽑아 준다. 종류마다 색이 달라야
+        도면에서 갈라 보인다.
+        """
         if name not in self.doc.layers:
+            if color is None:
+                color = PLAN_COLORS[self._cidx % len(PLAN_COLORS)]
+                self._cidx += 1
             lay = self.doc.layers.add(name, color=color)
             if desc:
                 lay.description = desc[:255]
@@ -160,7 +177,7 @@ class DxfBuilder:
                     if jimok:
                         self._text(jimok, (cx, cy - th * 0.7), th * 0.85, "D-PNU-TEXT")
 
-    def add_planning(self, spec, shapes, sub_layers=True, draw_label=False):
+    def add_planning(self, spec, shapes, sub_layers=True, draw_label=True):
         """도시계획·지역지구 도형을 넣는다.
 
         자료가 면(폴리곤)으로 오므로 테두리를 선으로 그린다. 도시계획선은
@@ -169,7 +186,7 @@ class DxfBuilder:
         sub_layers 를 켜면 종류마다 레이어를 나눈다. 도로를 예로 들면
         UP-도로-중로2류 처럼 갈라져 등급별로 끄고 켜기 쉽다.
         """
-        base, color = spec["layer"], spec["color"]
+        base = spec["layer"]
         th = self._text_height()
 
         for s in shapes:
@@ -179,7 +196,7 @@ class DxfBuilder:
                 safe = _safe_layer(kind)
                 if safe:
                     layer = f"{base}-{safe}"
-            self._ensure_layer(layer, color, f"{spec['label']} · {kind}")
+            self._ensure_layer(layer, None, f"{spec['label']} · {kind}")
 
             first = None
             shut = s.get("closed", True)
@@ -191,10 +208,10 @@ class DxfBuilder:
                     first = pts
                 self._polyline(pts, layer, closed=shut and len(pts) >= 3)
 
+            # 무엇인지 도면에 적어 준다. 글자는 레이어 색을 따르므로
+            # 그 선과 같은 색으로 나온다.
             if draw_label and kind and first and len(first) >= 3:
-                cx = sum(x for x, _ in first) / len(first)
-                cy = sum(y for _, y in first) / len(first)
-                self._text(kind, (cx, cy), th, layer)
+                self._text(kind, centroid(first), th * 0.9, layer)
 
     def add_reference_marks(self):
         """좌하단 기준점 십자와 방위표. 원점 이동을 켰을 때 특히 필요하다."""

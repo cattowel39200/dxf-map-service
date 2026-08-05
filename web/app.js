@@ -214,8 +214,8 @@ function refreshSummary() {
 
   const over = m.km2 > limit;
   const none = layers.length === 0;
-  const noKey = CFG && !CFG.has_vworld_key
-    && layers.some(l => l === 'parcel' || l === 'pnu');
+  // 지적도든 도시계획이든 모두 V-World 에서 받아 온다
+  const noKey = CFG && !CFG.has_vworld_key && layers.length > 0;
 
   $('bigNotice').classList.toggle('on', over || none || noKey);
   $('bigNotice').classList.toggle('err', noKey && !over && !none);
@@ -918,4 +918,62 @@ $('doneScrim').onclick = e => { if (e.target === $('doneScrim')) $('doneScrim').
   loadParcelPreview();
   loadNotices();
   refreshBoardBadge();
+})();
+
+
+// ── 도시계획 · 지역지구 고르기 ────────────────────────────────
+// 서버가 주는 목록으로 만든다. 여기 목록을 손댈 일이 없도록.
+(async () => {
+  let d;
+  try { d = await (await fetch('/api/layers')).json(); } catch { return; }
+  const box = document.getElementById('planGroups');
+  if (!box || !d.layers) return;
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  box.innerHTML = d.groups.map(g => {
+    const items = d.layers.filter(l => l.group === g);
+    if (!items.length) return '';
+    return `<details class="plangrp" data-grp="${esc(g)}">
+      <summary>${esc(g)}<span class="cnt">0 / ${items.length}</span></summary>
+      <div class="body">
+        ${items.map(l => `<label class="lay">
+          <input type="checkbox" data-lay="${esc(l.key)}" data-grp="${esc(g)}">
+          <span class="swatch" style="background:var(--text-3)"></span>
+          <span class="lay-name">${esc(l.label)}</span>
+          <span class="lay-code">${esc(l.layer)}</span></label>`).join('')}
+        <button type="button" class="all">이 묶음 모두</button>
+      </div>
+    </details>`;
+  }).join('');
+
+  const tally = () => {
+    box.querySelectorAll('.plangrp').forEach(g => {
+      const cs = [...g.querySelectorAll('input[data-lay]')];
+      const on = cs.filter(c => c.checked).length;
+      const el = g.querySelector('.cnt');
+      el.textContent = `${on} / ${cs.length}`;
+      el.classList.toggle('on', on > 0);
+    });
+  };
+
+  box.addEventListener('change', () => { tally(); refreshSummary(); });
+  box.querySelectorAll('.all').forEach(b => b.onclick = () => {
+    const cs = [...b.closest('.plangrp').querySelectorAll('input[data-lay]')];
+    const on = cs.every(c => c.checked);
+    cs.forEach(c => { c.checked = !on; });
+    tally();
+    refreshSummary();
+  });
+
+  if (d.unavailable && d.unavailable.length) {
+    const h = document.getElementById('planHelp');
+    if (h) {
+      h.innerHTML = h.innerHTML +
+        `<br><b>V-World에 없어 못 넣는 것</b> ${d.unavailable.length}종 — ` +
+        d.unavailable.map(u => esc(u.label)).join(', ');
+    }
+  }
+  tally();
 })();
