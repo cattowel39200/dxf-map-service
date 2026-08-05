@@ -13,7 +13,7 @@ import time
 
 from . import config, db
 
-FIELDS = ("biz_no", "biz_name", "biz_addr", "biz_type")
+FIELDS = ("req_name", "biz_no", "biz_name", "biz_addr", "biz_type")
 
 
 def _row(key: str) -> dict | None:
@@ -67,20 +67,20 @@ def request(key: str, machine: str, biz: dict, want_invoice: bool) -> dict:
                         (key,)).fetchone()
         if old:
             c.execute(
-                "UPDATE purchases SET email=?, machine=?, biz_no=?, biz_name=?,"
-                " biz_addr=?, biz_type=?, want_invoice=?, amount=?,"
+                "UPDATE purchases SET email=?, machine=?, req_name=?, biz_no=?,"
+                " biz_name=?, biz_addr=?, biz_type=?, want_invoice=?, amount=?,"
                 " status='pending', updated=? WHERE key=?",
-                (email, machine, vals["biz_no"], vals["biz_name"],
-                 vals["biz_addr"], vals["biz_type"], int(want_invoice),
-                 config.PRICE, now, key))
+                (email, machine, vals["req_name"], vals["biz_no"],
+                 vals["biz_name"], vals["biz_addr"], vals["biz_type"],
+                 int(want_invoice), config.PRICE, now, key))
         else:
             c.execute(
-                "INSERT INTO purchases (key, email, machine, biz_no, biz_name,"
-                " biz_addr, biz_type, want_invoice, amount, status, created,"
-                " updated) VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?, ?)",
-                (key, email, machine, vals["biz_no"], vals["biz_name"],
-                 vals["biz_addr"], vals["biz_type"], int(want_invoice),
-                 config.PRICE, now, now))
+                "INSERT INTO purchases (key, email, machine, req_name, biz_no,"
+                " biz_name, biz_addr, biz_type, want_invoice, amount, status,"
+                " created, updated) VALUES (?,?,?,?,?,?,?,?,?,?, 'pending', ?, ?)",
+                (key, email, machine, vals["req_name"], vals["biz_no"],
+                 vals["biz_name"], vals["biz_addr"], vals["biz_type"],
+                 int(want_invoice), config.PRICE, now, now))
         c.commit()
 
     return {"ok": True, "machine": machine, "amount": config.PRICE,

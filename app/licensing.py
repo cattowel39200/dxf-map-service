@@ -102,6 +102,12 @@ def delete_applicant(aid: int) -> bool:
 
 
 # ── 라이선스 ──────────────────────────────────────────────
+def has_key(email: str) -> bool:
+    """이 메일로 이미 쓸 수 있는 키가 있는지. 있으면 화면에 다시 띄우지 않고
+    메일로만 보낸다. 남의 주소를 넣어 키를 훔쳐보는 것을 막으려는 것이다."""
+    return bool(_latest_usable((email or "").strip().lower()))
+
+
 def issue(email: str, kind: str = "demo", note: str = "",
           reuse: bool = True) -> dict:
     """키를 발급한다.

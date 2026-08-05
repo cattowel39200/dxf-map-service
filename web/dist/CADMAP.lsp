@@ -33,7 +33,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.1.1")
+(setq *cm:version* "1.1.2")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -661,8 +661,8 @@
       "   3. 입금하실 때 [보내는 분] 이름 자리에 창에 표시된"
       "      PC 번호를 그대로 넣어 주십시오."
       "      이름으로 넣으시면 누구의 입금인지 확인이 늦어집니다."
-      "   4. 세금계산서가 필요하시면 [세금계산서] 를 켜고"
-      "      사업자등록번호·상호·주소·업종을 적어 주십시오."
+      "   4. 세금계산서가 필요하시면 [사업자 정보 적기] 를 눌러"
+      "      신청자 이름·사업자등록번호·상호·주소·업종을 적어 주십시오."
       "   5. [정품 신청하기] 를 누르면 접수됩니다."
       "   6. 입금이 확인되면 정품으로 바뀝니다. 다시 설치하실 필요 없습니다."
       ""
@@ -690,6 +690,7 @@
     "  label = \"세금계산서 정보\";"
     "  : boxed_column {"
     "    label = \"사업자 정보\";"
+    "    : edit_box { key = \"rnm\";  label = \"신청자 이름  \";   edit_width = 22; }"
     "    : edit_box { key = \"bno\";  label = \"사업자등록번호\"; edit_width = 22; }"
     "    : edit_box { key = \"bnm\";  label = \"상호        \";   edit_width = 30; }"
     "    : edit_box { key = \"badr\"; label = \"주소        \";   edit_width = 44; }"
@@ -704,12 +705,14 @@
   (setq id (load_dialog p) res nil)
   (if (and (>= id 0) (new_dialog "cm_biz" id))
     (progn
+      (set_tile "rnm"  (cm:n *cm:rnm* ""))
       (set_tile "bno"  (cm:n *cm:bno* ""))
       (set_tile "bnm"  (cm:n *cm:bnm* ""))
       (set_tile "badr" (cm:n *cm:badr* ""))
       (set_tile "btp"  (cm:n *cm:btp* ""))
       (action_tile "accept"
-        (strcat "(setq *cm:bno*  (get_tile \"bno\"))"
+        (strcat "(setq *cm:rnm*  (get_tile \"rnm\"))"
+                "(setq *cm:bno*  (get_tile \"bno\"))"
                 "(setq *cm:bnm*  (get_tile \"bnm\"))"
                 "(setq *cm:badr* (get_tile \"badr\"))"
                 "(setq *cm:btp*  (get_tile \"btp\"))"
@@ -727,6 +730,7 @@
         txt (cadr res))
   (if txt
     (progn
+      (if (cm:jstr txt "req_name") (setq *cm:rnm*  (cm:jstr txt "req_name")))
       (if (cm:jstr txt "biz_no")   (setq *cm:bno*  (cm:jstr txt "biz_no")))
       (if (cm:jstr txt "biz_name") (setq *cm:bnm*  (cm:jstr txt "biz_name")))
       (if (cm:jstr txt "biz_addr") (setq *cm:badr* (cm:jstr txt "biz_addr")))
@@ -739,6 +743,7 @@
     (strcat "{\"key\":\"" (cm:n *cm:key* "") "\","
             "\"machine\":\"" (cm:machine) "\","
             "\"want_invoice\":" (if *cm:want* "true" "false") ","
+            "\"req_name\":\"" (cm:n *cm:rnm*  "") "\","
             "\"biz_no\":\""   (cm:n *cm:bno*  "") "\","
             "\"biz_name\":\"" (cm:n *cm:bnm*  "") "\","
             "\"biz_addr\":\"" (cm:n *cm:badr* "") "\","
@@ -835,7 +840,8 @@
 (defun cm:bizsummary ( / )
   (if (= (cm:n *cm:bno* "") "")
     "   아직 적지 않으셨습니다."
-    (strcat "   " (cm:n *cm:bno* "") "   " (cm:n *cm:bnm* ""))))
+    (strcat "   " (cm:n *cm:rnm* "") "  "
+            (cm:n *cm:bno* "") "  " (cm:n *cm:bnm* ""))))
 
 ;; --------------------------------------------------------------- 정보
 (defun C:CMABOUT ( / p id res lic)

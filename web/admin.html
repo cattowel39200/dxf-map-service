@@ -361,13 +361,17 @@ function purBlock(l) {
 
   const rows = [];
   if (p.want_invoice) {
-    rows.push(['사업자등록번호', p.biz_no], ['상호', p.biz_name],
-              ['주소', p.biz_addr], ['업종', p.biz_type]);
+    rows.push(['신청자', p.req_name], ['사업자등록번호', p.biz_no],
+              ['상호', p.biz_name], ['주소', p.biz_addr], ['업종', p.biz_type]);
+  } else if (p.req_name) {
+    rows.push(['신청자', p.req_name]);
   }
-  const biz = rows.length
-    ? `<table class="biztbl">${rows.map(([k, v]) =>
-        `<tr><th>${k}</th><td>${esc(v || '—')}</td></tr>`).join('')}</table>`
-    : '<div class="purnote">세금계산서를 요청하지 않았습니다.</div>';
+  const biz = (rows.length
+      ? `<table class="biztbl">${rows.map(([k, v]) =>
+          `<tr><th>${k}</th><td>${esc(v || '—')}</td></tr>`).join('')}</table>`
+      : '')
+    + (p.want_invoice ? ''
+      : '<div class="purnote">세금계산서를 요청하지 않았습니다.</div>');
 
   const inv = p.want_invoice
     ? (p.invoiced

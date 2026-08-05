@@ -1,7 +1,7 @@
 {
-  "version": "1.1.1",
+  "version": "1.1.2",
   "date": "2026-08-05",
-  "notice": "정품신청·정보 창에서 PC 번호와 안내가 보이지 않던 것을 고쳤습니다.",
+  "notice": "세금계산서에 신청자 이름을 함께 받습니다.",
   "min_version": "1.0.0",
   "files": {
     "lisp": "/dist/CADMAP.lsp",

@@ -21,14 +21,39 @@ from tkinter import messagebox, ttk
 
 APP_NAME = "지적도 DXF 가져오기"
 COMPANY = "(주)경성엔지니어링"
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 SITE = "https://ks-down-map.com"
 
 LSP_NAME = "CADMAP.lsp"
 APP_KEY = "CADMAP"                       # AutoCAD 에 등록할 이름
 DEST = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "KyoungsungEng" / "CADMAP"
 SETTINGS = r"Software\KyoungsungEng\CADMAP"
-ACAD_ROOT = r"Software\Autodesk\AutoCAD"
+
+# 정식 AutoCAD 와 LT 는 레지스트리 자리가 다르다. 둘 다 찾아 보고,
+# LT 는 목록에 보여 주되 설치는 막는다. 왜 안 되는지 알려 드리려는 것이다.
+ACAD_ROOTS = [
+    (r"Software\Autodesk\AutoCAD", False),
+    (r"Software\Autodesk\AutoCAD LT", True),
+]
+
+# 레지스트리의 판 번호를 연도로 옮긴다. 2010(R18.0)부터 쓸 수 있다.
+YEARS = {
+    "R18.0": 2010, "R18.1": 2011, "R18.2": 2012,
+    "R19.0": 2013, "R19.1": 2014,
+    "R20.0": 2015, "R20.1": 2016,
+    "R21.0": 2017, "R22.0": 2018,
+    "R23.0": 2019, "R23.1": 2020,
+    "R24.0": 2021, "R24.1": 2022, "R24.2": 2023, "R24.3": 2024,
+    "R25.0": 2025, "R25.1": 2026,
+}
+LT_YEARS = {"R29": 2023, "R30": 2024, "R31": 2025, "R32": 2026}
+MIN_YEAR = 2010
+
+# LT 는 vlax-create-object 를 지원하지 않는다. 이 프로그램은 그 기능으로
+# 서버와 주고받으므로 LT 에서는 리습이 있어도 동작하지 않는다.
+LT_REASON = ("AutoCAD LT 는 지원하지 않습니다.\n"
+             "LT 2024부터 리습이 들어왔지만 외부 프로그램을 불러오는 기능이\n"
+             "빠져 있어, 서버와 통신하는 이 프로그램은 동작하지 않습니다.")
 
 KEY_RE = re.compile(r"^KS-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$")
 
@@ -50,42 +75,62 @@ def bundled(name: str) -> Path:
 
 # ─────────────────────────────────────────────────── AutoCAD 찾기
 def find_autocad() -> list[dict]:
-    """설치된 AutoCAD 를 모두 찾는다. [{release, product, path, label}]"""
-    found = []
-    try:
-        root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, ACAD_ROOT)
-    except OSError:
-        return found
+    """설치된 AutoCAD 를 모두 찾는다.
 
-    with root:
-        for i in range(winreg.QueryInfoKey(root)[0]):
-            try:
-                rel = winreg.EnumKey(root, i)          # 예: R24.2
-            except OSError:
-                break
-            if not rel.upper().startswith("R"):
-                continue
-            try:
-                relkey = winreg.OpenKey(root, rel)
-            except OSError:
-                continue
-            with relkey:
-                for j in range(winreg.QueryInfoKey(relkey)[0]):
-                    try:
-                        prod = winreg.EnumKey(relkey, j)   # 예: ACAD-8001:409
-                    except OSError:
-                        break
-                    if ":" not in prod:
-                        continue
-                    sub = f"{ACAD_ROOT}\\{rel}\\{prod}"
-                    label = _acad_label(sub, rel, prod)
-                    found.append({"release": rel, "product": prod,
-                                  "path": sub, "label": label})
+    [{release, product, path, label, lt, year, ok, why}]
+    ok 가 False 면 설치할 수 없는 것이고, why 에 까닭이 담긴다.
+    """
+    found = []
+    for acad_root, is_lt in ACAD_ROOTS:
+        try:
+            root = winreg.OpenKey(winreg.HKEY_CURRENT_USER, acad_root)
+        except OSError:
+            continue
+        with root:
+            for i in range(winreg.QueryInfoKey(root)[0]):
+                try:
+                    rel = winreg.EnumKey(root, i)          # 예: R24.2
+                except OSError:
+                    break
+                if not rel.upper().startswith("R"):
+                    continue
+                try:
+                    relkey = winreg.OpenKey(root, rel)
+                except OSError:
+                    continue
+                with relkey:
+                    for j in range(winreg.QueryInfoKey(relkey)[0]):
+                        try:
+                            prod = winreg.EnumKey(relkey, j)   # 예: ACAD-8001:409
+                        except OSError:
+                            break
+                        if ":" not in prod:
+                            continue
+                        # 정식 AutoCAD 자리에 LT 가 들어앉는 경우도 있다
+                        lt = is_lt or prod.upper().startswith("ACLT")
+                        sub = f"{acad_root}\\{rel}\\{prod}"
+                        found.append(_describe(sub, rel, prod, lt))
     return found
 
 
-def _acad_label(sub: str, rel: str, prod: str) -> str:
-    """제품 이름을 읽어 보고, 없으면 판 번호로 대신한다."""
+def _describe(sub: str, rel: str, prod: str, lt: bool) -> dict:
+    year = (LT_YEARS if lt else YEARS).get(rel)
+    label = _product_name(sub) or (
+        f"AutoCAD{' LT' if lt else ''} {year}" if year
+        else f"AutoCAD{' LT' if lt else ''} {rel}")
+
+    ok, why = True, ""
+    if lt:
+        ok, why = False, "LT 는 지원하지 않습니다"
+    elif year and year < MIN_YEAR:
+        ok, why = False, f"{MIN_YEAR} 이전 버전입니다"
+
+    return {"release": rel, "product": prod, "path": sub, "label": label,
+            "lt": lt, "year": year, "ok": ok, "why": why}
+
+
+def _product_name(sub: str) -> str:
+    """레지스트리에 적힌 제품 이름. 없으면 빈 글자."""
     for name in ("ProductName", "ProductNameShort"):
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub) as k:
@@ -94,10 +139,7 @@ def _acad_label(sub: str, rel: str, prod: str) -> str:
                     return str(v)
         except OSError:
             pass
-    year = {"R24.3": "2024", "R24.2": "2023", "R24.1": "2022", "R24.0": "2021",
-            "R23.1": "2020", "R23.0": "2019", "R22.0": "2018",
-            "R21.0": "2017", "R20.1": "2016"}.get(rel)
-    return f"AutoCAD {year}" if year else f"AutoCAD {rel}"
+    return ""
 
 
 # ─────────────────────────────────────────────────── 설치 / 제거
@@ -202,12 +244,24 @@ class Installer(tk.Tk):
                      bg=BG, fg="#b3261e", justify="left",
                      font=("맑은 고딕", 9)).pack(anchor="w")
         for a in self.acad:
-            v = tk.BooleanVar(value=True)
-            tk.Checkbutton(box, text=f"{a['label']}   ({a['release']})",
-                           variable=v, bg=BG, fg=FG, activebackground=BG,
-                           selectcolor=BG, font=("맑은 고딕", 10),
-                           anchor="w").pack(anchor="w", fill="x")
+            v = tk.BooleanVar(value=a["ok"])
+            label = f"{a['label']}   ({a['release']})"
+            if not a["ok"]:
+                label += f"   —  {a['why']}"
+            tk.Checkbutton(box, text=label, variable=v, bg=BG,
+                           fg=(FG if a["ok"] else "#b3261e"), activebackground=BG,
+                           selectcolor=BG, font=("맑은 고딕", 10), anchor="w",
+                           state=("normal" if a["ok"] else "disabled"),
+                           disabledforeground="#b3261e").pack(anchor="w", fill="x")
             self.vars.append((v, a))
+
+        if any(a["lt"] for a in self.acad):
+            tk.Label(box, text=LT_REASON, bg=BG, fg=SUB, justify="left",
+                     font=("맑은 고딕", 8)).pack(anchor="w", pady=(6, 0))
+        elif self.acad and not any(a["ok"] for a in self.acad):
+            tk.Label(box, text=f"AutoCAD {MIN_YEAR} 이상이 필요합니다.",
+                     bg=BG, fg="#b3261e", justify="left",
+                     font=("맑은 고딕", 9)).pack(anchor="w", pady=(6, 0))
 
         # ── 발급키
         tk.Label(self, text="발급키  (없으면 비워 두세요)", bg=BG, fg=FG,
@@ -240,10 +294,13 @@ class Installer(tk.Tk):
                              relief="flat", bg=ACC, fg="white",
                              font=("맑은 고딕", 10, "bold"))
         self.btn.pack(side="right", padx=(0, 8))
-        if not self.acad:
+        usable = [a for a in self.acad if a["ok"]]
+        if not usable:
             self.btn.configure(state="disabled", bg="#c9c9c9")
 
-        self.log(f"AutoCAD {len(self.acad)}개를 찾았습니다.")
+        self.log(f"AutoCAD {len(self.acad)}개를 찾았습니다."
+                 + (f"  (설치 가능 {len(usable)}개)"
+                    if len(usable) != len(self.acad) else ""))
         self.log(f"설치 위치  {DEST}")
 
     def log(self, s: str):
@@ -254,7 +311,7 @@ class Installer(tk.Tk):
         self.update_idletasks()
 
     def on_install(self):
-        targets = [a for v, a in self.vars if v.get()]
+        targets = [a for v, a in self.vars if v.get() and a["ok"]]
         if not targets:
             messagebox.showwarning("설치", "설치할 AutoCAD 를 하나 이상 골라 주세요.")
             return

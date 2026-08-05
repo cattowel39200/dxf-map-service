@@ -369,16 +369,43 @@ async def usage_stats(request: Request, days: int = 30):
 # ── 사용 신청 ─────────────────────────────────────────────
 @app.post("/api/apply")
 async def apply(request: Request):
-    """소개 페이지에서 이메일을 남기면 여기로 들어온다."""
+    """소개 페이지에서 신청하면 데모 발급키를 그 자리에서 내준다.
+
+    사람 손을 거치지 않는다. 데모는 PC 한 대에서 3일뿐이라 크게 새지 않고,
+    기다리게 하면 대부분 그냥 떠나 버린다.
+
+    다만 이미 발급된 키는 화면에 다시 띄우지 않고 메일로만 보낸다.
+    화면에 띄우면 남의 메일 주소를 넣어 키를 알아낼 수 있다.
+    """
     b = await request.json()
     email = (b.get("email") or "").strip()
     if not licensing.valid_email(email):
         raise HTTPException(400, "이메일 주소를 다시 확인해 주세요.")
+
+    name = (b.get("name") or "")[:60]
     a = licensing.apply(
-        email=email, name=(b.get("name") or "")[:60],
+        email=email, name=name,
         company=(b.get("company") or "")[:80], memo=(b.get("memo") or "")[:300],
         ip=_client_ip(request))
-    return {"ok": True, "already": a.get("already", False)}
+
+    had = licensing.has_key(email)
+    lic = licensing.issue(email, kind="demo", note="홈페이지 자동 발급")
+
+    mailed = False
+    if mailer.configured():
+        subject, body = mailer.demo_body(lic["key"], name)
+        try:
+            await asyncio.to_thread(mailer.send, email, subject, body, [])
+            mailed = True
+        except mailer.MailError:
+            mailed = False        # 메일이 막혀도 새 키는 화면에 보여 준다
+
+    return {"ok": True, "already": a.get("already", False),
+            "reissued": had, "mailed": mailed,
+            "kind": lic.get("kind", "demo"),
+            "demo_days": config.DEMO_DAYS,
+            # 새로 만든 키만 화면에 보여 준다
+            "key": ("" if had else lic["key"])}
 
 
 # ── 라이선스 검증 (리습이 부른다) ─────────────────────────

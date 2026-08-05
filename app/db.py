@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS purchases (
     biz_name     TEXT,                 -- 상호
     biz_addr     TEXT,                 -- 주소
     biz_type     TEXT,                 -- 업종
+    req_name     TEXT,                 -- 신청자 이름
     want_invoice INTEGER NOT NULL DEFAULT 0,   -- 세금계산서를 원하는지
     invoiced     INTEGER NOT NULL DEFAULT 0,   -- 발급을 마쳤는지
     invoiced_at  REAL,
@@ -115,6 +116,20 @@ CREATE INDEX IF NOT EXISTS idx_tr_key ON transfers(key, at);
 """
 
 
+# 나중에 늘린 칸. CREATE TABLE IF NOT EXISTS 는 이미 있는 표를 고치지 않으므로
+# 여기에 적어 두고 없으면 붙인다. 운영 중인 자료를 지우지 않고 넘어가려는 것이다.
+ADDED_COLUMNS = [
+    ("purchases", "req_name", "TEXT"),   # 신청자 이름
+]
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    for table, col, kind in ADDED_COLUMNS:
+        have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+        if have and col not in have:
+            c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
+
+
 def connect() -> sqlite3.Connection:
     global _conn
     if _conn is None:
@@ -122,6 +137,7 @@ def connect() -> sqlite3.Connection:
         _conn = sqlite3.connect(config.USAGE_DB, check_same_thread=False)
         _conn.row_factory = sqlite3.Row
         _conn.executescript(SCHEMA)
+        _migrate(_conn)
         _conn.commit()
     return _conn
 
