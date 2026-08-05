@@ -679,6 +679,63 @@ async def layer_catalog(format: str = "json"):
     }
 
 
+VWORLD_SEARCH_URL = "https://api.vworld.kr/req/search"
+
+
+@app.get("/api/search")
+async def unified_search(q: str = Query(..., min_length=2)):
+    """지번 · 도로명 · 장소 · 행정구역을 한꺼번에 찾는다.
+
+    V-World 검색을 네 갈래로 동시에 물어 묶어서 준다. 국내 지번은
+    바깥 지도 서비스보다 국토부 검색이 정확하다.
+    """
+    if not config.VWORLD_KEY:
+        raise HTTPException(503, "V-World 인증키가 설정되지 않았습니다.")
+
+    kinds = [
+        ("jibun",    "지번",     {"type": "address", "category": "parcel"}),
+        ("road",     "도로명",   {"type": "address", "category": "road"}),
+        ("place",    "장소",     {"type": "place"}),
+        ("district", "행정구역", {"type": "district", "category": "L4"}),
+    ]
+
+    async def one(c, extra):
+        try:
+            r = await c.get(VWORLD_SEARCH_URL, params={
+                "service": "search", "request": "search", "version": "2.0",
+                "key": config.VWORLD_KEY, "domain": config.VWORLD_DOMAIN,
+                "size": 5, "format": "json", "query": q, **extra})
+            b = r.json().get("response", {})
+            if b.get("status") != "OK":
+                return []
+            return (b.get("result") or {}).get("items") or []
+        except Exception:                     # noqa: BLE001 — 한 갈래 실패는 삼킨다
+            return []
+
+    async with httpx.AsyncClient(timeout=15.0,
+                                 headers={"User-Agent": config.USER_AGENT}) as c:
+        got = await asyncio.gather(*(one(c, extra) for _, _, extra in kinds))
+
+    out, seen = [], set()
+    for (kind, label, _), items in zip(kinds, got):
+        for it in items:
+            title = (it.get("title")
+                     or (it.get("address") or {}).get("parcel")
+                     or (it.get("address") or {}).get("road") or "").strip()
+            pt = it.get("point") or {}
+            try:
+                lon, lat = float(pt.get("x")), float(pt.get("y"))
+            except (TypeError, ValueError):
+                continue
+            dedup = (title, round(lon, 5), round(lat, 5))
+            if not title or dedup in seen:
+                continue
+            seen.add(dedup)
+            out.append({"kind": kind, "label": label, "title": title,
+                        "lon": lon, "lat": lat})
+    return {"query": q, "items": out[:18]}
+
+
 # ── 정품 구매 신청 (리습이 부른다) ────────────────────────
 @app.get("/api/purchase")
 async def purchase_get(key: str = ""):

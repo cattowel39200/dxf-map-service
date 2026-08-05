@@ -372,24 +372,114 @@ $('themeBtn').onclick = () => {
   parcelLayer.changed();
 };
 
-/* ── 주소 검색 (V-World 지오코더 대신 Nominatim) ── */
-$('search').addEventListener('keydown', async e => {
-  if (e.key !== 'Enter') return;
-  const q = e.target.value.trim();
-  if (!q) return;
-  try {
-    const r = await fetch(
-      'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=kr&q='
-      + encodeURIComponent(q));
-    const hits = await r.json();
-    if (!hits.length) { alert('검색 결과가 없습니다.'); return; }
-    map.getView().animate({
-      center: ol.proj.fromLonLat([parseFloat(hits[0].lon), parseFloat(hits[0].lat)]),
-      zoom: 17, duration: 400,
-    });
-  } catch {
-    alert('주소 검색 서비스에 연결할 수 없습니다.');
+/* ── 통합 검색 ────────────────────────────────────────────────
+   지번·도로명·장소·행정구역을 서버(V-World)에서 한꺼번에 찾아
+   입력하는 대로 목록을 보여 준다. 두 숫자를 넣으면 좌표로 바로 간다 —
+   경위도든, 고른 좌표계의 TM(X,Y)든 알아서 가려낸다. */
+const srchBox = document.createElement('div');
+srchBox.id = 'searchDrop';
+$('search').parentElement.style.position = 'relative';
+$('search').parentElement.appendChild(srchBox);
+
+const srchMarkSource = new ol.source.Vector();
+map.addLayer(new ol.layer.Vector({
+  source: srchMarkSource, zIndex: 11,
+  style: f => [
+    new ol.style.Style({ image: new ol.style.Circle({
+      radius: 13, fill: new ol.style.Fill({ color: 'rgba(15,95,115,0.18)' }) }) }),
+    new ol.style.Style({ image: new ol.style.Circle({
+      radius: 5, fill: new ol.style.Fill({ color: cssVar('--accent') }),
+      stroke: new ol.style.Stroke({ color: '#fff', width: 2 }) }) }),
+  ],
+}));
+
+const KIND_ICON = { jibun: '지번', road: '도로명', place: '장소',
+                    district: '행정구역', coord: '좌표' };
+
+function srchClose() { srchBox.classList.remove('on'); srchBox.innerHTML = ''; }
+
+function srchGo(item) {
+  srchClose();
+  $('search').value = item.title;
+  srchMarkSource.clear();
+  const c = ol.proj.fromLonLat([item.lon, item.lat]);
+  srchMarkSource.addFeature(new ol.Feature(new ol.geom.Point(c)));
+  map.getView().animate({ center: c,
+    zoom: item.kind === 'district' ? 15 : 18, duration: 400 });
+  setTimeout(() => srchMarkSource.clear(), 6000);
+}
+
+// "127.03, 37.55" 나 "203123.4, 451987.2"(TM) 를 알아본다
+function srchCoord(q) {
+  const m = q.match(/^\s*(-?[\d.]+)[,\s]+(-?[\d.]+)\s*$/);
+  if (!m) return null;
+  let a = parseFloat(m[1]), b = parseFloat(m[2]);
+  if (isNaN(a) || isNaN(b)) return null;
+  // 경위도 범위면 그대로 (둘 중 어느 차례로 넣었든)
+  for (const [lon, lat] of [[a, b], [b, a]]) {
+    if (lon >= 124 && lon <= 132 && lat >= 33 && lat <= 39)
+      return { kind: 'coord', title: `경위도 ${lon.toFixed(6)}, ${lat.toFixed(6)}`,
+               lon, lat };
   }
+  // 큰 수면 고른 좌표계의 X,Y 로 본다 (측량 좌표는 Y=동서, X=남북 표기가 섞여
+  // 있어 두 차례 모두 시도해 한국 안에 드는 쪽을 쓴다)
+  const code = $('crs').value;
+  if (!code || Math.abs(a) < 1000 || Math.abs(b) < 1000) return null;
+  for (const [x, y] of [[a, b], [b, a]]) {
+    try {
+      const [lon, lat] = proj4(`EPSG:${code}`, 'EPSG:4326', [x, y]);
+      if (lon >= 124 && lon <= 132 && lat >= 33 && lat <= 39)
+        return { kind: 'coord',
+                 title: `EPSG:${code}  X=${x.toLocaleString()} Y=${y.toLocaleString()}`,
+                 lon, lat };
+    } catch { /* 다음 조합 */ }
+  }
+  return null;
+}
+
+let srchTimer = null, srchSeq = 0, srchItems = [];
+$('search').addEventListener('input', () => {
+  clearTimeout(srchTimer);
+  const q = $('search').value.trim();
+  if (q.length < 2) { srchClose(); return; }
+  srchTimer = setTimeout(() => srchRun(q), 300);
+});
+
+async function srchRun(q) {
+  const seq = ++srchSeq;
+  const co = srchCoord(q);
+  let items = co ? [co] : [];
+  if (!co) {
+    try {
+      const r = await fetch('/api/search?q=' + encodeURIComponent(q));
+      if (r.ok) items = (await r.json()).items || [];
+    } catch { /* 아래 빈 안내 */ }
+  }
+  if (seq !== srchSeq) return;          // 그 사이 더 친 글자가 있다
+  srchItems = items;
+  if (!items.length) {
+    srchBox.innerHTML = '<div class="srch-empty">찾는 곳이 없습니다</div>';
+    srchBox.classList.add('on');
+    return;
+  }
+  const esc2 = s => String(s).replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  srchBox.innerHTML = items.map((it, i) => `
+    <button class="srch-item" data-i="${i}">
+      <span class="srch-kind k-${it.kind}">${KIND_ICON[it.kind] || ''}</span>
+      <span class="srch-title">${esc2(it.title)}</span>
+    </button>`).join('');
+  srchBox.classList.add('on');
+  srchBox.querySelectorAll('.srch-item').forEach(b =>
+    b.onclick = () => srchGo(srchItems[+b.dataset.i]));
+}
+
+$('search').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && srchItems.length) srchGo(srchItems[0]);
+  if (e.key === 'Escape') srchClose();
+});
+document.addEventListener('click', e => {
+  if (!srchBox.contains(e.target) && e.target !== $('search')) srchClose();
 });
 
 /* ── 지번 즐겨찾기 ──────────────────────────────
