@@ -167,10 +167,16 @@ def _assemble(job_id, box, target, options, layers, parcels, shapes=None):
         b.add_parcels(parcels,
                       draw_boundary="parcel" in layers,
                       draw_label="pnu" in layers)
-    for spec in layerdef.pick(layers):
+    # 색을 미리 정해 둔다. 지도에 미리 보인 색과 같아야 헷갈리지 않는다.
+    picked = layerdef.pick(layers)
+    colors = layerdef.color_map(
+        (s["key"], layerdef.name_of(s, g["props"]))
+        for s in picked for g in (shapes or {}).get(s["key"], []))
+
+    for spec in picked:
         got = (shapes or {}).get(spec["key"])
         if got:
-            b.add_planning(spec, got,
+            b.add_planning(spec, got, colors=colors,
                            sub_layers=(options.get("plan_sub_layers", True)
                                        and spec["key"] not in layerdef.NO_SPLIT),
                            draw_label=options.get("plan_labels", False))

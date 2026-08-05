@@ -430,6 +430,60 @@ async def license_auto(request: Request):
     return out
 
 
+@app.get("/api/plan")
+async def plan_preview(bbox: str = Query(...), keys: str = ""):
+    """지도에 도시계획선을 미리 그려 주기 위한 GeoJSON.
+
+    색은 도면에 들어갈 것과 같은 규칙으로 정한다. 화면에서 본 색과 도면
+    색이 다르면 무엇이 무엇인지 헷갈린다.
+    """
+    box = _parse_bbox(bbox)
+    if box.area_km2() > config.MAX_AREA_KM2 * 3:
+        raise HTTPException(400, "미리보기 영역이 너무 넓습니다.")
+
+    picked = layerdef.pick([k.strip() for k in keys.split(",") if k.strip()])
+    if not picked:
+        return {"type": "FeatureCollection", "features": []}
+
+    got = {}
+    for spec in picked[:12]:          # 화면 미리보기는 열두 종까지만
+        try:
+            got[spec["key"]] = await vworld.fetch_shapes(box, spec["source"])
+        except Exception:             # noqa: BLE001 — 하나 없다고 다 막지 않는다
+            got[spec["key"]] = []
+
+    colors = layerdef.color_map(
+        (s["key"], layerdef.name_of(s, g["props"]))
+        for s in picked for g in got.get(s["key"], []))
+
+    feats = []
+    for spec in picked:
+        for g in got.get(spec["key"], []):
+            kind = layerdef.name_of(spec, g["props"])
+            aci = colors.get((spec["key"], kind), 7)
+            for ring in g["rings"]:
+                feats.append({
+                    "type": "Feature",
+                    "properties": {"key": spec["key"], "kind": kind,
+                                   "label": spec["label"],
+                                   "color": _aci_hex(aci),
+                                   "line": not g.get("closed", True)},
+                    "geometry": {"type": "LineString",
+                                 "coordinates": [list(pt) for pt in ring]},
+                })
+    return {"type": "FeatureCollection", "features": feats}
+
+
+def _aci_hex(aci: int) -> str:
+    """AutoCAD 색 번호를 화면용 색으로. 도면과 같은 색으로 보이게 한다."""
+    try:
+        from ezdxf.colors import aci2rgb
+        r, g, b = aci2rgb(int(aci))
+        return f"#{r:02x}{g:02x}{b:02x}"
+    except Exception:                 # noqa: BLE001
+        return "#888888"
+
+
 @app.get("/api/layers")
 async def layer_catalog(format: str = "json"):
     """받을 수 있는 자료 목록. 웹 화면과 리습이 이 목록으로 메뉴를 만든다.

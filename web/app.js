@@ -965,6 +965,7 @@ $('doneScrim').onclick = e => { if (e.target === $('doneScrim')) $('doneScrim').
     cs.forEach(c => { c.checked = !on; });
     tally();
     refreshSummary();
+    box.dispatchEvent(new Event('change'));
   });
 
   if (d.unavailable && d.unavailable.length) {
@@ -977,3 +978,73 @@ $('doneScrim').onclick = e => { if (e.target === $('doneScrim')) $('doneScrim').
   }
   tally();
 })();
+
+
+/* ── 도시계획선 미리보기 ──────────────────────────────────────
+   고른 자료를 지도에 그대로 그려 준다. 색은 서버가 정해 주는데,
+   도면에 들어갈 색과 같은 규칙이라 화면과 도면이 어긋나지 않는다. */
+const planSource = new ol.source.Vector();
+const planLayer = new ol.layer.Vector({
+  source: planSource,
+  zIndex: 5,
+  style: f => {
+    const c = f.get('color') || '#888';
+    const z = map.getView().getZoom();
+    return new ol.style.Style({
+      stroke: new ol.style.Stroke({ color: c, width: f.get('line') ? 2.2 : 1.6 }),
+      text: z >= 16 ? new ol.style.Text({
+        text: f.get('kind') || '',
+        placement: 'line',
+        overflow: true,
+        font: '11px system-ui, "Malgun Gothic", sans-serif',
+        fill: new ol.style.Fill({ color: c }),
+        stroke: new ol.style.Stroke({ color: cssVar('--panel'), width: 3 }),
+      }) : undefined,
+    });
+  },
+});
+map.addLayer(planLayer);
+
+let planTimer = null;
+function schedulePlan() {
+  clearTimeout(planTimer);
+  planTimer = setTimeout(loadPlan, 400);
+}
+
+async function loadPlan() {
+  const keys = selectedLayers().filter(k => k !== 'parcel' && k !== 'pnu');
+  if (!keys.length || !CFG || !CFG.has_vworld_key || map.getView().getZoom() < 15) {
+    planSource.clear();
+    return;
+  }
+  const ext = map.getView().calculateExtent(map.getSize());
+  const [minLon, minLat] = ol.proj.toLonLat([ext[0], ext[1]]);
+  const [maxLon, maxLat] = ol.proj.toLonLat([ext[2], ext[3]]);
+  if (metrics({ minLon, minLat, maxLon, maxLat }).km2 > CFG.max_area_km2 * 3) {
+    planSource.clear();
+    return;
+  }
+  try {
+    const r = await fetch(`/api/plan?bbox=${minLon},${minLat},${maxLon},${maxLat}`
+                          + `&keys=${encodeURIComponent(keys.join(','))}`);
+    if (!r.ok) { planSource.clear(); return; }
+    const gj = await r.json();
+    planSource.clear();
+    planSource.addFeatures(new ol.format.GeoJSON().readFeatures(gj, {
+      dataProjection: 'EPSG:4326',
+      featureProjection: map.getView().getProjection(),
+    }));
+  } catch {
+    planSource.clear();
+  }
+}
+
+map.on('moveend', schedulePlan);
+document.addEventListener('DOMContentLoaded', () => {
+  const g = document.getElementById('planGroups');
+  if (g) g.addEventListener('change', schedulePlan);
+});
+{
+  const g = document.getElementById('planGroups');
+  if (g) g.addEventListener('change', schedulePlan);
+}

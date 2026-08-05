@@ -27,13 +27,7 @@ LAYERS = [
 
 TEXT_STYLE = "HANGUL"
 
-# 종류마다 다른 색을 준다. 도면에 겹쳐 놓고 보아야 하므로 서로 잘 갈리는
-# 것만 골랐다. 글자는 레이어 색을 따르므로 선과 저절로 같은 색이 된다.
-PLAN_COLORS = [
-    1, 3, 5, 2, 4, 6, 30, 130, 90, 50, 170, 210, 20, 110, 70, 190, 230, 150,
-    40, 140, 60, 160, 80, 180, 100, 200, 120, 220, 10, 250, 34, 84, 134, 184,
-    214, 24, 74, 124, 174, 224, 44, 94, 144, 194, 244, 14, 64, 114, 164, 204,
-]
+from .layers import PLAN_COLORS, color_map  # noqa: F401
 
 # 레이어 이름에 쓸 수 없는 글자. 제어문자까지 걸러 낸다.
 _BAD_LAYER_CHARS = re.compile(r'[<>/\\":;?*|,=`]|[\x00-\x1f]')
@@ -177,7 +171,8 @@ class DxfBuilder:
                     if jimok:
                         self._text(jimok, (cx, cy - th * 0.7), th * 0.85, "D-PNU-TEXT")
 
-    def add_planning(self, spec, shapes, sub_layers=True, draw_label=True):
+    def add_planning(self, spec, shapes, sub_layers=True, draw_label=True,
+                     colors=None):
         """도시계획·지역지구 도형을 넣는다.
 
         자료가 면(폴리곤)으로 오므로 테두리를 선으로 그린다. 도시계획선은
@@ -196,7 +191,9 @@ class DxfBuilder:
                 safe = _safe_layer(kind)
                 if safe:
                     layer = f"{base}-{safe}"
-            self._ensure_layer(layer, None, f"{spec['label']} · {kind}")
+            self._ensure_layer(layer,
+                               (colors or {}).get((spec['key'], kind)),
+                               f"{spec['label']} · {kind}")
 
             first = None
             shut = s.get("closed", True)
