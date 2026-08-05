@@ -68,9 +68,40 @@ const selLayer = new ol.layer.Vector({
   }),
 });
 
+/* 즐겨찾기에서 고른 지점을 표시하는 별 표식 */
+const favMarkSource = new ol.source.Vector();
+const favMarkLayer = new ol.layer.Vector({
+  source: favMarkSource,
+  zIndex: 10,
+  style: f => [
+    new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 15,
+        fill: new ol.style.Fill({ color: 'rgba(15,95,115,0.16)' }),
+      }),
+    }),
+    new ol.style.Style({
+      image: new ol.style.RegularShape({
+        points: 5, radius: 11, radius2: 4.6, angle: 0,
+        fill: new ol.style.Fill({ color: cssVar('--accent') }),
+        stroke: new ol.style.Stroke({ color: '#fff', width: 2 }),
+      }),
+      text: new ol.style.Text({
+        text: f.get('name') || '',
+        font: '600 12px ' + cssVar('--sans'),
+        offsetY: -26,
+        padding: [3, 6, 3, 6],
+        fill: new ol.style.Fill({ color: '#fff' }),
+        backgroundFill: new ol.style.Fill({ color: cssVar('--accent') }),
+        overflow: true,
+      }),
+    }),
+  ],
+});
+
 const map = new ol.Map({
   target: 'map',
-  layers: [baseLayer, parcelLayer, selLayer],
+  layers: [baseLayer, parcelLayer, selLayer, favMarkLayer],
   view: new ol.View({
     center: ol.proj.fromLonLat([126.9418, 37.1832]),
     zoom: 16,
@@ -418,9 +449,7 @@ function favRender() {
     if (e.target.closest('.fav-del')) return;
     const f = favLoad()[+el.dataset.i];
     if (!f) return;
-    map.getView().animate({
-      center: ol.proj.fromLonLat([f.lon, f.lat]), zoom: f.zoom, duration: 450,
-    });
+    goToFavorite(f);
     $('favPanel').classList.remove('on');
     $('favToggle').classList.remove('on');
   });
@@ -430,6 +459,26 @@ function favRender() {
     list.splice(+b.dataset.del, 1);
     favSave(list);
   });
+}
+
+/* 즐겨찾기로 이동한다. 그 지점을 화면 정중앙에 놓고 별 표식을 남긴다.
+   저장할 때의 축척이 너무 멀면 지번이 안 보이므로 최소 17까지 당긴다. */
+function goToFavorite(f) {
+  const center = ol.proj.fromLonLat([f.lon, f.lat]);
+  favMarkSource.clear();
+  const mark = new ol.Feature(new ol.geom.Point(center));
+  mark.set('name', f.name);
+  favMarkSource.addFeature(mark);
+
+  map.getView().animate({
+    center,
+    zoom: Math.max(f.zoom || 17, 17),
+    duration: 480,
+  });
+}
+
+function clearFavMarker() {
+  favMarkSource.clear();
 }
 
 $('favAdd').onclick = () => {
@@ -495,7 +544,10 @@ map.getViewport().addEventListener('contextmenu', e => {
 map.getViewport().addEventListener('pointerdown', ctxClose);
 map.on('movestart', () => { ctxClose(); addrClose(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { ctxClose(); addrClose(); $('favPanel').classList.remove('on'); }
+  if (e.key === 'Escape') {
+    ctxClose(); addrClose(); clearFavMarker();
+    $('favPanel').classList.remove('on'); $('favToggle').classList.remove('on');
+  }
 });
 
 async function fetchAddress(lon, lat) {
