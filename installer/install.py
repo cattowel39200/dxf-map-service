@@ -21,7 +21,7 @@ from tkinter import messagebox, ttk
 
 APP_NAME = "지적도 DXF 가져오기"
 COMPANY = "(주)경성엔지니어링"
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 SITE = "https://ks-down-map.com"
 
 LSP_NAME = "CADMAP.lsp"

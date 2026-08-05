@@ -1,7 +1,7 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "date": "2026-08-05",
-  "notice": "발급키를 따로 신청하지 않아도 됩니다. 처음 실행하면 저절로 만들어집니다.",
+  "notice": "색은 AutoCAD 색상표에서 고르시고, 삭제 메뉴가 생겼습니다.",
   "min_version": "1.0.0",
   "files": {
     "lisp": "/dist/CADMAP.lsp",

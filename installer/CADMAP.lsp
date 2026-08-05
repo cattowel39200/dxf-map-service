@@ -33,7 +33,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.2.0")
+(setq *cm:version* "1.3.0")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -76,13 +76,10 @@
   (if (setq hit (assoc code *cm:crslist*)) (cdr hit) code))
 
 ;; --------------------------------------------------------------- 좌표 설정 팝업
-(defun cm:Dialog (licnote / p id res names codes cols colnames styles)
-  (setq codes    (mapcar 'car *cm:crslist*)
-        names    (mapcar '(lambda (q) (strcat "EPSG:" (car q) "  " (cdr q)))
-                         *cm:crslist*)
-        cols     (mapcar 'car *cm:collist*)
-        colnames (mapcar '(lambda (q) (strcat (cdr q) " (" (car q) ")")) *cm:collist*)
-        styles   (cm:styles))
+(defun cm:Dialog (licnote / p id res names styles)
+  (setq names  (mapcar '(lambda (q) (strcat "EPSG:" (car q) "  " (cdr q)))
+                       *cm:crslist*)
+        styles (cm:styles))
 
   (setq p (cm:dcl (list
     "cm_ins : dialog {"
@@ -94,8 +91,10 @@
     "  : boxed_column {"
     "    label = \"필지선\";"
     "    : row {"
-    "      : edit_box   { key = \"plyr\"; label = \"레이어명\"; edit_width = 14; }"
-    "      : popup_list { key = \"pcol\"; label = \"색상\";     width = 13; }"
+    "      : edit_box { key = \"plyr\"; label = \"레이어명\"; edit_width = 14; }"
+    "      : text { label = \"  색상\"; }"
+    "      : image_button { key = \"pcol\"; width = 5; height = 1.3; }"
+    "      : text { key = \"pcoln\"; label = \"\"; width = 11; }"
     "    }"
     "  }"
     "  : boxed_column {"
@@ -105,8 +104,10 @@
     "      : popup_list { key = \"tstyle\"; label = \"스타일\"; width = 18; }"
     "    }"
     "    : row {"
-    "      : edit_box   { key = \"tlyr\"; label = \"레이어명\"; edit_width = 14; }"
-    "      : popup_list { key = \"tcol\"; label = \"색상\";     width = 13; }"
+    "      : edit_box { key = \"tlyr\"; label = \"레이어명\"; edit_width = 14; }"
+    "      : text { label = \"  색상\"; }"
+    "      : image_button { key = \"tcol\"; width = 5; height = 1.3; }"
+    "      : text { key = \"tcoln\"; label = \"\"; width = 11; }"
     "    }"
     "  }"
     "  : text { key = \"note\"; label = \"\"; width = 46; }"
@@ -120,25 +121,25 @@
   (if (or (< id 0) (not (new_dialog "cm_ins" id)))
     (alert "설정 창을 열 수 없습니다.")
     (progn
-      (start_list "crs")    (foreach n names    (add_list n)) (end_list)
-      (start_list "pcol")   (foreach n colnames (add_list n)) (end_list)
-      (start_list "tcol")   (foreach n colnames (add_list n)) (end_list)
-      (start_list "tstyle") (foreach n styles   (add_list n)) (end_list)
+      (start_list "crs")    (foreach n names  (add_list n)) (end_list)
+      (start_list "tstyle") (foreach n styles (add_list n)) (end_list)
 
-      (set_tile "crs"    (itoa (cm:idx *cm:crs*  *cm:crslist*)))
-      (set_tile "pcol"   (itoa (cm:idx *cm:pcol* *cm:collist*)))
-      (set_tile "tcol"   (itoa (cm:idx *cm:tcol* *cm:collist*)))
+      (set_tile "crs"    (itoa (cm:idx *cm:crs* *cm:crslist*)))
       (set_tile "tstyle" (itoa (cm:n (vl-position *cm:tstyle* styles) 0)))
+      (set_tile "pcoln" (cm:colname *cm:pcol*))
+      (set_tile "tcoln" (cm:colname *cm:tcol*))
+      (cm:swatch "pcol" *cm:pcol*)
+      (cm:swatch "tcol" *cm:tcol*)
       (set_tile "plyr"  *cm:plyr*)
       (set_tile "tlyr"  *cm:tlyr*)
       (set_tile "tsize" (rtos *cm:tsize* 2 2))
       (set_tile "note"  (cm:n licnote ""))
 
+      (action_tile "pcol" "(cm:pickpcol)")
+      (action_tile "tcol" "(cm:picktcol)")
       (action_tile "accept"
         (strcat
           "(setq *cm:crs*    (nth (atoi (get_tile \"crs\"))    '(" (cm:codes *cm:crslist*) ")))"
-          "(setq *cm:pcol*   (nth (atoi (get_tile \"pcol\"))   '(" (cm:codes *cm:collist*) ")))"
-          "(setq *cm:tcol*   (nth (atoi (get_tile \"tcol\"))   '(" (cm:codes *cm:collist*) ")))"
           "(setq *cm:tstyle* (nth (atoi (get_tile \"tstyle\")) '(" (cm:strs styles) ")))"
           "(setq *cm:plyr*  (cm:lname (get_tile \"plyr\")  \"지적도선\"))"
           "(setq *cm:tlyr*  (cm:lname (get_tile \"tlyr\")  \"지적도문자\"))"
@@ -240,6 +241,37 @@
   (if (and *cm:tstyle* (not (member *cm:tstyle* out)))
     (setq out (cons *cm:tstyle* out)))
   (if out out (list "Standard")))
+
+;; --------------------------------------------------------------- 색 고르기
+;; 색 이름을 글자로 늘어놓는 대신, AutoCAD 색상표를 그대로 띄운다.
+;; 도면에서 늘 보던 화면이라 헤매지 않으시고, 255색을 다 쓰실 수 있다.
+(defun cm:colname (c / hit)
+  (if (setq hit (assoc c *cm:collist*)) (cdr hit) (strcat "색 " c)))
+
+(defun cm:swatch (key col)
+  ;; 고르신 색을 네모 칸에 그대로 칠해 보여 준다
+  (vl-catch-all-apply
+    '(lambda ()
+       (start_image key)
+       (fill_image 0 0 (dimx_tile key) (dimy_tile key) (atoi col))
+       (end_image)))
+  (princ))
+
+(defun cm:pickpcol ( / n)
+  (if (setq n (acad_colordlg (atoi *cm:pcol*) nil))
+    (progn
+      (setq *cm:pcol* (itoa n))
+      (cm:swatch "pcol" *cm:pcol*)
+      (set_tile "pcoln" (cm:colname *cm:pcol*))))
+  (princ))
+
+(defun cm:picktcol ( / n)
+  (if (setq n (acad_colordlg (atoi *cm:tcol*) nil))
+    (progn
+      (setq *cm:tcol* (itoa n))
+      (cm:swatch "tcol" *cm:tcol*)
+      (set_tile "tcoln" (cm:colname *cm:tcol*))))
+  (princ))
 
 ;; --------------------------------------------------------------- 글 상자
 (defun cm:textbox (title lines / p id)
@@ -712,6 +744,10 @@
       "   · 받은 자료는 연속지적도라 실제 경계와 다를 수 있습니다."
       "     경계 확정이나 측량 성과로는 쓰실 수 없습니다."
       ""
+      "■ 지우시려면"
+      "   메뉴 [지적도] - [프로그램 삭제] 를 누르십시오."
+      "   발급키는 남겨 두므로, 나중에 다시 까셔도 그대로 쓰입니다."
+      ""
       "■ 문의"
       "   (주)경성엔지니어링    https://ks-down-map.com"))
   (princ))
@@ -889,6 +925,173 @@
     (strcat "   " (cm:n *cm:rnm* "") "  "
             (cm:n *cm:bno* "") "  " (cm:n *cm:bnm* ""))))
 
+;; --------------------------------------------------------------- 프로그램 삭제
+;; 설치 프로그램을 다시 찾지 않으셔도 여기서 지우실 수 있다.
+;; 발급키는 남겨 두는 것이 기본이다. 다시 까시면 그대로 쓰이도록.
+(defun cm:prodkey ( / pk)
+  (setq pk (vl-catch-all-apply 'vlax-product-key))
+  (if (or (vl-catch-all-error-p pk) (null pk) (= pk ""))
+    nil
+    (if (= (strcase (substr pk 1 5)) "HKEY_")
+      pk
+      (strcat "HKEY_CURRENT_USER\\" pk))))
+
+(defun cm:dropmenu ( / acad mnu)
+  (vl-catch-all-apply
+    '(lambda ()
+       (setq acad (vlax-get-acad-object)
+             mnu  (vla-get-Menus (vla-Item (vla-get-MenuGroups acad) 0)))
+       (vla-Delete (vla-Item mnu "지적도"))))
+  (princ))
+
+(defun C:CMREMOVE ( / p id res pk path gone)
+  (setq path (cm:regget "Path" nil))
+  (if (or (null path) (not (findfile path)))
+    (setq path (findfile "CADMAP.lsp")))
+
+  (setq p (cm:dcl (list
+    "cm_rm : dialog {"
+    "  label = \"지적도 프로그램 삭제\";"
+    "  : boxed_column {"
+    "    label = \"지울 것\";"
+    "    : text { label = \"· AutoCAD 가 켜질 때 스스로 불러오던 등록\"; }"
+    "    : text { label = \"· 설치된 CADMAP.lsp 파일\"; }"
+    "    : text { label = \"· 상단의 지적도 메뉴\"; }"
+    "    : text { key = \"pth\"; label = \"\"; width = 56; }"
+    "  }"
+    "  : boxed_column {"
+    "    label = \"남길 것\";"
+    "    : toggle { key = \"delkey\"; label = \"발급키와 설정도 함께 지우기\"; }"
+    "    : text { label = \"켜지 않으시면 발급키와 설정은 그대로 남습니다.\"; }"
+    "    : text { label = \"나중에 다시 까시면 그대로 쓰입니다.\"; }"
+    "  }"
+    "  : text { label = \"지운 뒤 AutoCAD 를 다시 켜시면 깨끗해집니다.\"; }"
+    "  : row {"
+    "    : button { key = \"accept\"; label = \"삭제\"; width = 12; }"
+    "    : button { key = \"cancel\"; label = \"취소\"; is_default = true; is_cancel = true; width = 12; }"
+    "  }"
+    "}")))
+
+  (setq id (load_dialog p) res nil)
+  (if (and (>= id 0) (new_dialog "cm_rm" id))
+    (progn
+      (set_tile "pth" (strcat "  " (cm:n path "(설치 위치를 찾지 못했습니다)")))
+      (set_tile "delkey" "0")
+      (action_tile "accept"
+        "(setq *cm:delkey* (= (get_tile \"delkey\") \"1\"))(done_dialog 1)")
+      (action_tile "cancel" "(done_dialog 0)")
+      (setq res (start_dialog))))
+  (if (>= id 0) (unload_dialog id))
+  (vl-file-delete p)
+
+  (if (/= res 1)
+    (cm:msg "삭제를 취소했습니다.")
+    (progn
+      (setq gone 0)
+      ;; 1) 자동 실행 등록
+      (if (setq pk (cm:prodkey))
+        (if (not (vl-catch-all-error-p
+                   (vl-catch-all-apply 'vl-registry-delete
+                     (list (strcat pk "\\Applications\\CADMAP")))))
+          (progn (cm:msg "자동 실행 등록을 지웠습니다.")
+                 (setq gone (1+ gone)))
+          (cm:msg "자동 실행 등록을 지우지 못했습니다."))
+        (cm:msg "AutoCAD 등록 위치를 찾지 못했습니다."))
+
+      ;; 2) 메뉴
+      (cm:dropmenu)
+      (cm:msg "지적도 메뉴를 내렸습니다.")
+
+      ;; 3) 발급키와 설정
+      (if *cm:delkey*
+        (progn
+          (foreach k '("Key" "Path" "Version" "Crs" "Server" "PLyr" "PCol"
+                       "TLyr" "TCol" "TSize" "TStyle" "Contact" "LastCheck")
+            (vl-catch-all-apply 'vl-registry-delete (list *cm:reg* k)))
+          (vl-catch-all-apply 'vl-registry-delete (list *cm:reg*))
+          (setq *cm:key* "")
+          (cm:msg "발급키와 설정을 지웠습니다."))
+        (cm:msg "발급키와 설정은 남겨 두었습니다."))
+
+      ;; 4) 파일 (지금 불려 있는 파일이라 지워도 이번 판은 계속 돈다)
+      (if (and path (findfile path))
+        (if (vl-file-delete path)
+          (cm:msg (strcat "파일을 지웠습니다.  " path))
+          (cm:msg (strcat "파일을 지우지 못했습니다. 직접 지워 주세요.  " path))))
+
+      (cm:msg "")
+      (cm:msg "삭제를 마쳤습니다. AutoCAD 를 다시 켜 주십시오.")
+      (alert "삭제를 마쳤습니다.\n\nAutoCAD 를 다시 켜시면 깨끗해집니다.\n\n그동안 써 주셔서 고맙습니다.")))
+  (princ))
+
+;; --------------------------------------------------------------- 호환성 점검
+;; AutoCAD 말고 다른 CAD 에서도 되는지 그 자리에서 확인할 수 있게 둔다.
+(defun cm:has (name)
+  ;; atoms-family 는 없는 이름도 자리를 비워 돌려준다. 목록이 비지 않았는지가
+  ;; 아니라 그 자리에 값이 들어 있는지를 봐야 한다.
+  (if (car (atoms-family 1 (list (strcase name)))) T nil))
+
+(defun cm:chkobj (prog / o)
+  (setq o (vl-catch-all-apply 'vlax-create-object (list prog)))
+  (if (vl-catch-all-error-p o)
+    nil
+    (progn (vl-catch-all-apply 'vlax-release-object (list o)) T)))
+
+(defun cm:dline (good name note)
+  (strcat (if good "  [ 됨 ]   " "  [안됨]   ") name
+          (if (or (null note) (= note "")) "" (strcat "   -  " note))))
+
+(defun C:CMDIAG ( / sxh wh wsh fso reg dcl mnu srv lines http)
+  (cm:msg "이 CAD 에서 쓸 수 있는지 점검하는 중...")
+  (setq sxh (cm:chkobj "MSXML2.ServerXMLHTTP.6.0")
+        wh  (cm:chkobj "WinHttp.WinHttpRequest.5.1")
+        wsh (cm:chkobj "WScript.Shell")
+        fso (cm:chkobj "Scripting.FileSystemObject")
+        http (or sxh wh wsh))
+  (setq reg (and (cm:has "VL-REGISTRY-WRITE")
+                 (not (vl-catch-all-error-p
+                        (vl-catch-all-apply 'vl-registry-write
+                          (list *cm:reg* "Probe" "1"))))
+                 (= "1" (cm:regget "Probe" ""))))
+  (vl-catch-all-apply 'vl-registry-delete (list *cm:reg* "Probe"))
+  (setq dcl (and (cm:has "LOAD_DIALOG") (cm:has "ACAD_COLORDLG")))
+  (setq mnu (not (vl-catch-all-error-p
+                   (vl-catch-all-apply
+                     '(lambda () (vla-get-Menus
+                                   (vla-Item (vla-get-MenuGroups
+                                               (vlax-get-acad-object)) 0)))))))
+  (setq srv (cm:alive))
+
+  (setq lines (list
+    (strcat "지적도 DXF 가져오기  " *cm:version* "  호환성 점검")
+    (strcat "CAD 판  " (cm:n (getvar "ACADVER") "?")
+            "    프로그램  " (cm:n (getvar "PRODUCT") ""))
+    ""
+    "■ 꼭 있어야 하는 것"
+    (cm:dline http "서버 통신 (vlax-create-object)"
+              (cond (sxh "ServerXMLHTTP") (wh "WinHttp") (wsh "curl 경유")
+                    (T "셋 다 안 되어 자료를 받을 수 없습니다")))
+    (cm:dline dcl "설정 창 (DCL · 색상표)" (if dcl "" "창을 띄울 수 없습니다"))
+    (cm:dline reg "설정 저장 (레지스트리)" (if reg "" "설정이 남지 않습니다"))
+    (cm:dline srv "서버 연결" (if srv *cm:server* "인터넷 연결을 확인해 주세요"))
+    ""
+    "■ 있으면 좋은 것"
+    (cm:dline fso "PC 번호 정밀도"
+              (if fso "" "드라이브 번호 없이 만듭니다. 쓰는 데 지장은 없습니다"))
+    (cm:dline mnu "상단 메뉴"
+              (if mnu "" "메뉴가 안 생깁니다. 명령을 직접 치시면 됩니다"))
+    ""
+    (if (and http dcl reg)
+      "판정   이 CAD 에서 쓰실 수 있습니다."
+      "판정   이 CAD 에서는 쓰실 수 없습니다.")
+    ""
+    "안 되는 항목이 있으면 이 화면을 그대로 알려 주십시오."
+    "  (주)경성엔지니어링    https://ks-down-map.com"))
+
+  (foreach l lines (cm:msg l))
+  (cm:textbox "호환성 점검" lines)
+  (princ))
+
 ;; --------------------------------------------------------------- 정보
 (defun C:CMABOUT ( / p id res lic)
   (setq lic (if (= (cm:n *cm:key* "") "")
@@ -911,8 +1114,9 @@
     "    : text { label = \"https://ks-down-map.com\"; }"
     "  }"
     "  : row {"
-    "    : button { key = \"upd\";    label = \"업데이트 확인\"; width = 16; }"
-    "    : button { key = \"keyb\";   label = \"발급키 등록\";   width = 14; }"
+    "    : button { key = \"upd\";    label = \"업데이트 확인\"; width = 15; }"
+    "    : button { key = \"keyb\";   label = \"발급키 등록\";   width = 13; }"
+    "    : button { key = \"diag\";   label = \"호환성 점검\";   width = 13; }"
     "    : button { key = \"accept\"; label = \"닫기\"; is_default = true; is_cancel = true; width = 10; }"
     "  }"
     "}")))
@@ -926,12 +1130,14 @@
       (set_tile "srv" (strcat "서 버     " *cm:server*))
       (action_tile "upd"    "(done_dialog 2)")
       (action_tile "keyb"   "(done_dialog 3)")
+      (action_tile "diag"   "(done_dialog 4)")
       (action_tile "accept" "(done_dialog 0)")
       (setq res (start_dialog))))
   (if (>= id 0) (unload_dialog id))
   (vl-file-delete p)
   (cond ((= res 2) (C:CMUPDATE))
-        ((= res 3) (C:CMKEY)))
+        ((= res 3) (C:CMKEY))
+        ((= res 4) (C:CMDIAG)))
   (princ))
 
 ;; ====================================================== 풀다운 메뉴
@@ -957,6 +1163,8 @@
        (vla-AddMenuItem  m 3 "도움말"     (cm:mac "CMHELP"))
        (vla-AddMenuItem  m 4 "정품신청"   (cm:mac "CMBUY"))
        (vla-AddMenuItem  m 5 "정보"       (cm:mac "CMABOUT"))
+       (vla-AddSeparator m 6)
+       (vla-AddMenuItem  m 7 "프로그램 삭제" (cm:mac "CMREMOVE"))
        (setq bar (vla-get-MenuBar acad))
        (vla-InsertInMenuBar m (vla-get-Count bar))
        (if (= (getvar "MENUBAR") 0) (setvar "MENUBAR" 1))))
@@ -1225,6 +1433,8 @@
 ;; 도움말·정보는 AutoCAD 자체 명령과 겹칠 수 있어 앞에 지적도를 붙인다.
 (defun C:지적도도움말 () (C:CMHELP))
 (defun C:지적도정보   () (C:CMABOUT))
+(defun C:지적도삭제   () (C:CMREMOVE))
+(defun C:지적도점검   () (C:CMDIAG))
 (defun C:지적도업데이트 () (C:CMUPDATE))
 (defun C:지적도홈     () (C:CMHOME))
 
@@ -1241,6 +1451,7 @@
 (cm:msg "    지적도정보    판 번호 · 발급키 · PC 번호")
 (cm:msg "    발급키        발급키 등록 및 확인")
 (cm:msg "    좌표          클릭한 점의 좌표를 도면에 기입")
+(cm:msg "    지적도삭제    이 프로그램을 지웁니다")
 (cm:msg (strcat "  좌표계  EPSG:" *cm:crs* "   " (cm:crsname *cm:crs*)))
 (cm:msg (strcat "  발급키  " (if (= (cm:n *cm:key* "") "")
                                "없음 - 지적도삽입 을 누르시면 자동으로 받습니다"

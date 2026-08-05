@@ -110,10 +110,6 @@ h2.sec .n{font-family:var(--mono);font-size:11px;color:var(--accent-hi);
 .dl-name{font-size:15px;font-weight:650;letter-spacing:-.01em}
 .dl-name span{font-family:var(--mono);font-size:13px;color:var(--accent-hi)}
 .dl-meta{font-size:11.5px;color:var(--text-3);margin-top:3px}
-.dl-note{margin-top:14px;padding:11px 13px;border-radius:8px;font-size:12.5px;
-  line-height:1.6;background:var(--accent-soft);color:var(--accent-hi);
-  border:1px solid var(--accent-line);display:none}
-.dl-note.on{display:block}
 .dl-warn{margin-top:12px;padding:11px 13px;border-radius:8px;font-size:12px;line-height:1.6;
   background:var(--warn-soft);color:var(--warn);
   border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);word-break:keep-all}
@@ -133,41 +129,10 @@ h2.sec .n{font-family:var(--mono);font-size:11px;color:var(--accent-hi);
 .verchips span{font-family:var(--mono);font-size:11px;padding:3px 7px;
   border-radius:5px;background:var(--accent-soft);color:var(--accent-hi);
   border:1px solid var(--accent-line)}
-.dl-free{margin-top:14px;padding:12px 14px;border-radius:8px;font-size:12.5px;
-  line-height:1.65;background:var(--accent-soft);color:var(--accent-hi);
-  border:1px solid var(--accent-line);word-break:keep-all}
 
 .vernote{font-size:11.5px;color:var(--text-3);line-height:1.65;margin:11px 0 0;
   word-break:keep-all}
 .vernote code{font-family:var(--mono);font-size:10.5px}
-
-/* 발급키 결과 */
-.keyout{display:none;margin-top:16px;padding:16px 18px;border-radius:10px;
-  background:var(--accent-soft);border:1px solid var(--accent-line)}
-.keyout.on{display:block}
-.keylabel{font-size:11px;font-weight:650;color:var(--accent-hi);
-  letter-spacing:.04em}
-.keyrow{display:flex;align-items:center;gap:10px;margin-top:7px;flex-wrap:wrap}
-.keybig{font-family:var(--mono);font-size:21px;font-weight:700;
-  letter-spacing:.04em;color:var(--text-1);word-break:break-all}
-.keymeta{font-size:11.5px;color:var(--text-3);margin-top:7px}
-.keysteps{margin:13px 0 0;padding-left:19px;font-size:12px;line-height:1.75;
-  color:var(--text-2)}
-.keysteps li{margin:2px 0}
-
-/* 정품 안내 */
-.buybox{background:var(--panel);border:1px solid var(--line);
-  border-radius:11px;padding:18px 20px}
-.buyhead{display:flex;justify-content:space-between;align-items:flex-start;
-  gap:16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.buyprice{font-size:24px;font-weight:700;letter-spacing:-.02em}
-.buysub{font-size:11.5px;color:var(--text-3);margin-top:3px}
-.buybank{text-align:right}
-.bk-l{font-size:10.5px;color:var(--text-3);letter-spacing:.04em}
-.bk-v{font-family:var(--mono);font-size:12.5px;font-weight:600;margin-top:3px}
-.buysteps{margin:14px 0 0;padding-left:19px;font-size:12.5px;line-height:1.8;
-  color:var(--text-2);word-break:keep-all}
-.buysteps li{margin:4px 0}
 
 @media (max-width:640px){
   .vergrid{grid-template-columns:1fr}
@@ -221,7 +186,6 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
         </svg>
         3일 무료로 써보기
       </a>
-      <a class="btn-ghost" href="#download">설치 파일 받기</a>
       <a class="btn-ghost" href="#how">사용법 보기</a>
     </div>
   </section>
@@ -316,6 +280,7 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
         <li>사용 기간 무기한</li>
         <li>PC 1대에서 사용</li>
         <li><b>쓰던 키가 그대로 전환됩니다</b></li>
+        <li>입금자명은 <b>PC 번호</b>로</li>
         <li>재설치·재발급 없음</li>
       </ul>
       <div class="bank" id="bankBox">
@@ -342,21 +307,11 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
         설치 파일 받기
       </a>
     </div>
-    <div class="dl-note" id="dlNotice"></div>
-    <div class="dl-warn">
-      <b>설치할 때 파란 경고창이 뜹니다.</b>
-      Windows가 배포자를 모르는 프로그램에 띄우는 화면입니다.
-      <b>추가 정보 → 실행</b>을 누르면 설치가 진행됩니다.
-    </div>
-    <div class="dl-free">
-      <b>발급키를 따로 신청하지 않으셔도 됩니다.</b>
-      설치하고 <b>지적도삽입</b>을 처음 누르시면 이 PC 앞으로
-      3일 데모 발급키가 저절로 만들어집니다. 메일 주소를 적거나
-      승인을 기다리실 필요가 없습니다.
-    </div>
-    <p class="dl-help">설치 파일이 AutoCAD를 찾아 자동 실행까지 등록해 드립니다.
-      관리자 권한은 필요 없고, 설치 창의 <b>제거</b> 단추로 되돌릴 수 있습니다.
-      설치 후 AutoCAD를 다시 켜면 상단에 <b>지적도</b> 메뉴가 생깁니다.</p>
+    <p class="dl-help">설치할 때 Windows 경고창이 뜨면
+      <b>추가 정보 → 실행</b>을 누르시면 됩니다.
+      발급키는 따로 신청하지 않으셔도 되고, 처음 실행하면 3일 데모가 시작됩니다.</p>
+    <p class="dl-help"><b>정품</b>은 데모를 설치하신 뒤 AutoCAD에서
+      <b>지적도 → 정품신청</b>으로 신청해 주십시오.</p>
   </div>
 
   <h3 class="sub">쓰실 수 있는 AutoCAD</h3>
@@ -380,84 +335,6 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
         있습니다. 이 프로그램은 그 기능으로 서버와 통신하므로 LT에서는 동작하지
         않습니다. LT 2023 이하는 리습 자체를 지원하지 않습니다.</p>
     </div>
-  </div>
-
-  <h2 class="sec" id="apply"><span class="n">선택</span>미리 받아 두시겠다면</h2>
-  <div class="apply">
-    <p class="lead"><b>이 칸은 안 쓰셔도 됩니다.</b> 설치하고 실행하면 발급키가
-       저절로 만들어집니다. 다만 키를 메일로 받아 두고 싶으시거나 문의하실
-       내용이 있으면 여기에 남겨 주십시오.</p>
-    <div class="frm" id="applyForm">
-      <div>
-        <label class="req" for="fEmail">이메일</label>
-        <input type="email" id="fEmail" placeholder="name@example.com" autocomplete="email">
-      </div>
-      <div class="two">
-        <div>
-          <label for="fName">이름</label>
-          <input type="text" id="fName" placeholder="홍길동" autocomplete="name" maxlength="60">
-        </div>
-        <div>
-          <label for="fCompany">회사·소속</label>
-          <input type="text" id="fCompany" placeholder="○○엔지니어링" autocomplete="organization" maxlength="80">
-        </div>
-      </div>
-      <div>
-        <label for="fMemo">문의사항 (선택)</label>
-        <textarea id="fMemo" rows="2" placeholder="궁금한 점이 있으면 적어 주세요" maxlength="300"></textarea>
-      </div>
-      <button class="btn-ghost" id="applyBtn" style="justify-content:center">메일로 받기 · 문의하기</button>
-    </div>
-
-    <div class="keyout" id="keyOut">
-      <div class="keylabel">발급키</div>
-      <div class="keyrow">
-        <code class="keybig" id="keyVal">—</code>
-        <button class="btn-ghost" id="keyCopy">복사</button>
-      </div>
-      <div class="keymeta" id="keyMeta"></div>
-      <ol class="keysteps">
-        <li>위 <b>설치 파일 받기</b>로 프로그램을 설치합니다.</li>
-        <li>AutoCAD를 다시 켜고 상단 <b>지적도</b> 메뉴를 엽니다.</li>
-        <li><b>정보 → 발급키 등록</b>에 이 키를 넣으시면 바로 쓰실 수 있습니다.
-            설치할 때 키 칸에 미리 넣으셔도 됩니다.</li>
-      </ol>
-    </div>
-
-    <div class="msg" id="applyMsg"></div>
-    <p class="privacy">남겨 주신 이메일은 발급키 발송과 문의 답변에만 씁니다.
-       다른 용도로 쓰거나 제3자에게 제공하지 않습니다.</p>
-  </div>
-
-  <h3 class="sub">정품으로 바꾸시려면</h3>
-  <div class="buybox">
-    <div class="buyhead">
-      <div>
-        <div class="buyprice" id="buyPrice">44,000원</div>
-        <div class="buysub">부가세 포함 · 기간 제한 없음 · PC 1대</div>
-      </div>
-      <div class="buybank">
-        <div class="bk-l">입금 계좌</div>
-        <div class="bk-v" id="buyBank">농협 301-0019-9326-91 (예금주 안세종)</div>
-      </div>
-    </div>
-    <ol class="buysteps">
-      <li>설치하고 <b>지적도삽입</b>을 한 번 실행합니다. 발급키가 저절로
-          만들어집니다.</li>
-      <li>AutoCAD에서 <b>지적도 → 정품신청</b>을 엽니다.
-          창에 <b>PC 번호</b>가 나옵니다.</li>
-      <li>위 계좌로 입금하시되, <b>보내는 분 이름 자리에 PC 번호를 그대로</b>
-          넣어 주십시오. 이름으로 넣으시면 어느 분 입금인지 확인이 늦어집니다.</li>
-      <li><b>연락처</b>(이메일 또는 전화)를 적어 주십시오. 입금 확인과
-          세금계산서 발송에 씁니다.</li>
-      <li>세금계산서가 필요하시면 같은 창에서 <b>사업자 정보 적기</b>를 눌러
-          신청자 이름·사업자등록번호·상호·주소·업종을 적어 주십시오.</li>
-      <li><b>정품 신청하기</b>를 누르면 접수됩니다.
-          입금이 확인되면 <b>쓰시던 키가 그대로 정품으로 바뀝니다.</b>
-          다시 설치하거나 키를 새로 받으실 필요가 없습니다.</li>
-    </ol>
-    <p class="dl-help">CAD를 아직 설치하지 않으셨다면 먼저 데모 발급키를 받아
-      설치해 주십시오. PC 번호는 설치한 PC에서만 확인할 수 있습니다.</p>
   </div>
 
   <h2 class="sec"><span class="n">FAQ</span>자주 묻는 질문</h2>
@@ -485,8 +362,6 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line-soft);
       <p><b>따로 받지 않으셔도 됩니다.</b> 설치하고 <b>지적도삽입</b>을 처음
          누르시면 그 PC 앞으로 3일 데모 발급키가 저절로 만들어집니다.
          받으신 키는 <b>지적도 → 정보</b> 창에서 확인하실 수 있습니다.</p>
-      <p>키를 메일로 받아 두고 싶으시면 위 <a href="#apply">신청 칸</a>에
-         이메일을 남겨 주셔도 됩니다.</p>
     </details>
     <details>
       <summary>데모를 지우고 다시 깔면 3일이 새로 시작되나요?</summary>
@@ -521,11 +396,8 @@ const $ = id => document.getElementById(id);
 
   if (cfg.bank) $('bankInfo').textContent = cfg.bank;
   if (cfg.price) {
-    const won = cfg.price.toLocaleString('ko-KR') + '원';
-    $('planPrice').textContent = won;
-    $('buyPrice').textContent = won;
+    $('planPrice').textContent = cfg.price.toLocaleString('ko-KR') + '원';
   }
-  if (cfg.bank) $('buyBank').textContent = cfg.bank;
   else $('bankBox').style.display = 'none';
   if (cfg.demo_days) $('demoDays').textContent = cfg.demo_days;
 
@@ -549,10 +421,6 @@ const $ = id => document.getElementById(id);
       $('dlBtn').classList.add('off');
       $('dlBtn').removeAttribute('href');
     }
-    if (v.notice) {
-      $('dlNotice').textContent = v.notice;
-      $('dlNotice').classList.add('on');
-    }
   } catch {
     $('dlMeta').textContent = '버전 정보를 불러오지 못했습니다.';
   }
@@ -564,73 +432,6 @@ $('themeBtn').onclick = () => {
   document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
 };
 
-$('applyBtn').onclick = async () => {
-  const email = $('fEmail').value.trim();
-  const msg = $('applyMsg');
-  msg.className = 'msg';
-  if (!/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(email)) {
-    msg.className = 'msg err';
-    msg.textContent = '이메일 주소를 다시 확인해 주세요.';
-    $('fEmail').focus();
-    return;
-  }
-  $('applyBtn').disabled = true;
-  $('applyBtn').textContent = '발급하는 중…';
-  try {
-    const r = await fetch('/api/apply', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email, name: $('fName').value, company: $('fCompany').value,
-        memo: $('fMemo').value }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.detail || '발급하지 못했습니다.');
-
-    if (d.key) {
-      // 새로 만든 키만 화면에 띄운다. 이미 있던 키는 메일로만 간다.
-      $('keyVal').textContent = d.key;
-      $('keyMeta').textContent =
-        `처음 실행한 때부터 ${d.demo_days || 3}일 동안 쓰실 수 있습니다.` +
-        (d.mailed ? ' 같은 키를 메일로도 보내 드렸습니다.'
-                  : ' (메일 발송에 실패해 화면에만 보여 드립니다. 꼭 적어 두세요.)');
-      $('keyOut').classList.add('on');
-      $('keyOut').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      msg.className = 'msg';
-      msg.textContent = '';
-      ['fEmail', 'fName', 'fCompany', 'fMemo'].forEach(i => { $(i).value = ''; });
-    } else {
-      $('keyOut').classList.remove('on');
-      msg.className = d.mailed ? 'msg ok' : 'msg err';
-      msg.textContent = d.mailed
-        ? '이미 발급받으신 이메일입니다. 쓰시던 발급키를 메일로 다시 보내 드렸습니다.'
-        : '이미 발급받으신 이메일인데 메일을 보내지 못했습니다. 문의해 주세요.';
-    }
-  } catch (e) {
-    msg.className = 'msg err';
-    msg.textContent = e.message;
-  } finally {
-    $('applyBtn').disabled = false;
-    $('applyBtn').textContent = '메일로 받기 · 문의하기';
-  }
-};
-
-$('keyCopy').onclick = async () => {
-  const k = $('keyVal').textContent.trim();
-  if (!k || k === '—') return;
-  try {
-    await navigator.clipboard.writeText(k);
-    $('keyCopy').textContent = '복사했습니다';
-  } catch {
-    // 클립보드가 막힌 브라우저에서는 직접 고르실 수 있게 선택해 드린다
-    const r = document.createRange();
-    r.selectNodeContents($('keyVal'));
-    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-    $('keyCopy').textContent = 'Ctrl+C 를 누르세요';
-  }
-  setTimeout(() => { $('keyCopy').textContent = '복사'; }, 2200);
-};
-
-$('fEmail').addEventListener('keydown', e => { if (e.key === 'Enter') $('applyBtn').click(); });
 </script>
 </body>
 </html>
