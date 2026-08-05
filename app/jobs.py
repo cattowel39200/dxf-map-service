@@ -126,7 +126,14 @@ async def _run(job: Job, req: dict):
             job.stage_progress = 0.0
             for i, spec in enumerate(plans):
                 try:
-                    got = await vworld.fetch_shapes(box, spec["source"])
+                    if spec.get("api") == "wfs":
+                        got = await vworld.fetch_wfs(box, spec["source"])
+                        if len(got) >= 1000:
+                            job.warnings.append(
+                                f"{spec['label']}: 1000개까지만 받았습니다. "
+                                "영역을 줄이면 다 받아집니다.")
+                    else:
+                        got = await vworld.fetch_shapes(box, spec["source"])
                 except Exception as exc:      # noqa: BLE001
                     got = []
                     job.warnings.append(f"{spec['label']}: {exc}")

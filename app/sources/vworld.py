@@ -233,13 +233,9 @@ async def fetch_shapes(box: BBox, layer: str, progress=None) -> list[dict]:
                 break
 
             for f in feats:
-                geom = f.get("geometry") or {}
-                rings = _rings_of(geom)
-                if rings:
-                    # 선 자료(도로 중심선 등)를 닫아 버리면 엉뚱한 면이 된다.
-                    closed = "Line" not in str(geom.get("type") or "")
-                    out.append({"props": f.get("properties") or {},
-                                "rings": rings, "closed": closed})
+                parsed = _shape_of(f)
+                if parsed:
+                    out.append(parsed)
 
             if total is None:
                 try:
@@ -254,6 +250,31 @@ async def fetch_shapes(box: BBox, layer: str, progress=None) -> list[dict]:
             page += 1
 
     return out
+
+
+def _shape_of(f: dict) -> dict | None:
+    """도형 하나를 {props, rings, closed, points} 로 편다."""
+    geom = f.get("geometry") or {}
+    kind = str(geom.get("type") or "")
+    rings = _rings_of(geom)
+    points = _points_of(geom)
+    if not rings and not points:
+        return None
+    return {"props": f.get("properties") or {},
+            "rings": rings, "points": points,
+            # 선 자료(도로 중심선 등)를 닫아 버리면 엉뚱한 면이 된다.
+            "closed": "Line" not in kind}
+
+
+def _points_of(geom: dict) -> list[tuple[float, float]]:
+    kind = geom.get("type")
+    co = geom.get("coordinates") or []
+    if kind == "Point" and len(co) >= 2:
+        return [(float(co[0]), float(co[1]))]
+    if kind == "MultiPoint":
+        return [(float(p[0]), float(p[1])) for p in co
+                if isinstance(p, (list, tuple)) and len(p) >= 2]
+    return []
 
 
 def _rings_of(geom: dict) -> list[list[tuple[float, float]]]:
@@ -308,3 +329,40 @@ async def props_at(client, lon: float, lat: float, layer: str,
     return [f.get("properties") or {} for f in
             body.get("result", {}).get("featureCollection", {})
                 .get("features", [])]
+
+
+WFS_URL = "https://api.vworld.kr/req/wfs"
+
+
+async def fetch_wfs(box: BBox, typename: str, progress=None) -> list[dict]:
+    """Data API 에 없는 레이어는 WFS 로 받는다. 형식만 다를 뿐 같은 벡터다.
+
+    한 번에 1000개까지만 받는다. 과속방지턱처럼 촘촘한 자료는 넘칠 수
+    있는데, 그때는 부르는 쪽이 경고를 남긴다.
+    """
+    if not config.VWORLD_KEY:
+        raise VWorldError("V-World 인증키가 없습니다.")
+    params = {
+        "SERVICE": "WFS", "REQUEST": "GetFeature", "VERSION": "1.1.0",
+        "TYPENAME": typename, "KEY": config.VWORLD_KEY,
+        "DOMAIN": config.VWORLD_DOMAINS[0] if config.VWORLD_DOMAINS else "",
+        "MAXFEATURES": 1000, "SRSNAME": "EPSG:4326",
+        "OUTPUT": "application/json",
+        # WFS 1.1.0 의 EPSG:4326 은 위도가 먼저다. 경도부터 넣으면 빈손이 온다.
+        "BBOX": "{1},{0},{3},{2},EPSG:4326".format(*box.as_tuple()),
+    }
+    async with httpx.AsyncClient(timeout=config.HTTP_TIMEOUT,
+                                 headers={"User-Agent": config.USER_AGENT}) as c:
+        r = await c.get(WFS_URL, params=params)
+    try:
+        body = r.json()
+    except ValueError:
+        return []
+    out = []
+    for f in body.get("features") or []:
+        parsed = _shape_of(f)
+        if parsed:
+            out.append(parsed)
+    if progress:
+        progress(1.0)
+    return out

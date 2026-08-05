@@ -205,6 +205,15 @@ class DxfBuilder:
                     first = pts
                 self._polyline(pts, layer, closed=shut and len(pts) >= 3)
 
+            # 점 자료(CCTV·도서관 같은 시설)는 점을 찍고 이름을 단다
+            for lonlat in s.get("points") or []:
+                px = self._pts([lonlat])
+                if px:
+                    self.msp.add_point(px[0], dxfattribs={"layer": layer})
+                    self._bump(layer)
+                    if draw_label and kind:
+                        self._text(kind, (px[0][0], px[0][1] + th), th * 0.8, layer)
+
             # 무엇인지 도면에 적어 준다. 글자는 레이어 색을 따르므로
             # 그 선과 같은 색으로 나온다.
             if draw_label and kind and first and len(first) >= 3:

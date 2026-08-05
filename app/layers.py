@@ -125,16 +125,37 @@ SPECS: list[tuple] = [
 # 도로명주소 도로는 1 km2 안에 이름이 백 가지가 넘는다.
 NO_SPLIT = {"rd_addr", "riv_basin"}
 
+# 자동 조사분이 이름을 담는 칸은 레이어마다 제각각이라, 흔한 것을
+# 앞에서부터 찾아 쓴다. 없으면 제목이 그대로 쓰인다.
+GENERIC_FIELDS = ("uname", "dgm_nm", "name", "nm", "kname", "fac_nam",
+                  "riv_nm", "sbsnnm", "exc_nam", "lcl_nam", "grade")
+
 # 화면에 그대로 쓰는 사전
 CATALOG = {
     s[0]: {"key": s[0], "label": s[1], "group": s[2], "source": s[3],
-           "fields": s[4], "layer": s[5], "color": s[6]}
+           "fields": s[4], "layer": s[5], "color": s[6], "api": "data"}
     for s in SPECS
 }
 
+# V-World 전 레이어를 조사해 벡터가 나온 것들 (Data API 82 + WFS 50)
+from .layers_auto import AUTO as _AUTO      # noqa: E402
+
+def _safe(s):
+    import re as _re
+    return _re.sub(r"[^\w가-힣()]+", "", s)[:24]
+
+for _k, _label, _grp, _src, _api in _AUTO:
+    if _k in CATALOG:
+        continue
+    CATALOG[_k] = {"key": _k, "label": _label, "group": _grp, "source": _src,
+                   "fields": GENERIC_FIELDS, "layer": "TM-" + _safe(_label),
+                   "color": 7, "api": _api}
+
 KEYS = tuple(CATALOG)
 GROUPS = ("도시계획시설", "용도지역", "용도지구", "용도구역",
-          "개별법령", "하천 · 도로")
+          "개별법령", "하천 · 도로",
+          "항공 · 군사", "교육 · 학군", "환경 · 지질", "해양 · 수자원",
+          "산업 · 개발", "생활 · 관광", "공공 · 행정", "기타 주제도")
 
 # V-World 에 아예 없어 넣지 못한 것. 화면에 그대로 밝혀 둔다.
 UNAVAILABLE = [
@@ -175,9 +196,9 @@ def catalog() -> list[dict]:
     """묶음 차례대로 늘어놓는다. 화면 목록에 그대로 쓴다."""
     out = []
     for g in GROUPS:
-        for s in SPECS:
-            if s[2] == g:
-                out.append(dict(CATALOG[s[0]]))
+        for c in CATALOG.values():
+            if c["group"] == g:
+                out.append(dict(c))
     return out
 
 
