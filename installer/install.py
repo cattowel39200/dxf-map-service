@@ -143,23 +143,87 @@ def _product_name(sub: str) -> str:
 
 
 # ─────────────────────────────────────────────────── 설치 / 제거
+def _profiles(acad: dict) -> list[str]:
+    """이 AutoCAD 의 프로파일 목록. 어느 것으로 켜실지 모르니 모두에 넣는다."""
+    root = f"{acad['path']}\\Profiles"
+    out = []
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, root) as k:
+            for i in range(winreg.QueryInfoKey(k)[0]):
+                out.append(f"{root}\\{winreg.EnumKey(k, i)}")
+    except OSError:
+        pass
+    return out
+
+
+def _startup_list(k) -> list[str]:
+    try:
+        n = int(winreg.QueryValueEx(k, "NumStartup")[0])
+    except OSError:
+        n = 0
+    out = []
+    for i in range(1, n + 1):
+        try:
+            out.append(str(winreg.QueryValueEx(k, f"{i}Startup")[0]))
+        except OSError:
+            pass
+    return out
+
+
+def _write_startup(k, paths: list[str]) -> None:
+    # 번호를 1부터 다시 매긴다. 중간이 비면 AutoCAD 가 그 뒤를 읽지 않는다.
+    try:
+        old = int(winreg.QueryValueEx(k, "NumStartup")[0])
+    except OSError:
+        old = 0
+    for i in range(1, max(old, len(paths)) + 1):
+        try:
+            winreg.DeleteValue(k, f"{i}Startup")
+        except OSError:
+            pass
+    for i, p in enumerate(paths, 1):
+        winreg.SetValueEx(k, f"{i}Startup", 0, winreg.REG_SZ, p)
+    winreg.SetValueEx(k, "NumStartup", 0, winreg.REG_DWORD, len(paths))
+
+
 def register(acad: dict, loader: Path) -> None:
-    """AutoCAD 가 켜질 때 이 리습을 스스로 불러오게 한다."""
-    path = f"{acad['path']}\\Applications\\{APP_KEY}"
-    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path) as k:
-        winreg.SetValueEx(k, "DESCRIPTION", 0, winreg.REG_SZ, APP_NAME)
-        winreg.SetValueEx(k, "LOADER", 0, winreg.REG_SZ, str(loader))
-        winreg.SetValueEx(k, "LOADCTRLS", 0, winreg.REG_DWORD, 2)   # 시작할 때
-        winreg.SetValueEx(k, "MANAGED", 0, winreg.REG_DWORD, 1)
+    """AutoCAD 가 켜질 때 이 리습을 스스로 불러오게 한다.
+
+    리습은 APPLOAD 의 '시작 세트'에 넣어야 불린다. Applications 키는
+    ARX(.arx/.dll) 전용이라 .lsp 를 적어 두어도 아무 일도 일어나지 않는다.
+    """
+    want = str(loader)
+    for prof in _profiles(acad):
+        path = f"{prof}\\Dialogs\\Appload\\Startup"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path) as k:
+            cur = _startup_list(k)
+            if any(x.lower() == want.lower() for x in cur):
+                continue
+            _write_startup(k, cur + [want])
 
 
 def unregister(acad: dict) -> bool:
-    path = f"{acad['path']}\\Applications\\{APP_KEY}"
+    hit = False
+    for prof in _profiles(acad):
+        path = f"{prof}\\Dialogs\\Appload\\Startup"
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path,
+                                0, winreg.KEY_ALL_ACCESS) as k:
+                cur = _startup_list(k)
+                keep = [x for x in cur if LSP_NAME.lower() not in x.lower()]
+                if len(keep) != len(cur):
+                    _write_startup(k, keep)
+                    hit = True
+        except OSError:
+            pass
+    # 예전 판이 잘못 넣어 둔 자리도 치운다
     try:
-        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, path)
-        return True
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER,
+                         f"{acad['path']}\\Applications\\{APP_KEY}")
+        hit = True
     except OSError:
-        return False
+        pass
+    return hit
 
 
 def save_setting(name: str, value: str) -> None:
@@ -311,7 +375,29 @@ class Installer(tk.Tk):
         self.log_box.configure(state="disabled")
         self.update_idletasks()
 
+    @staticmethod
+    def _acad_running() -> bool:
+        try:
+            import subprocess
+            r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq acad.exe"],
+                               capture_output=True, text=True, timeout=10,
+                               creationflags=0x08000000)
+            return "acad.exe" in (r.stdout or "").lower()
+        except Exception:                       # noqa: BLE001
+            return False
+
     def on_install(self):
+        # AutoCAD 는 끝나면서 프로파일 설정을 통째로 되쓴다. 켜 둔 채로
+        # 넣으면 우리가 적은 것이 지워진다.
+        if self._acad_running():
+            if not messagebox.askyesno(
+                    "AutoCAD 가 켜져 있습니다",
+                    "AutoCAD 를 먼저 닫아 주십시오.\n\n"
+                    "켜 둔 채로 설치하면 AutoCAD 가 끝나면서 예전 설정을\n"
+                    "되써 버려, 다시 켜도 메뉴가 나오지 않습니다.\n\n"
+                    "그래도 진행할까요?"):
+                return
+
         targets = [a for v, a in self.vars if v.get() and a["ok"]]
         if not targets:
             messagebox.showwarning("설치", "설치할 AutoCAD 를 하나 이상 골라 주세요.")
