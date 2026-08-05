@@ -239,7 +239,24 @@ def read_setting(name: str, default: str = "") -> str:
         return default
 
 
+def clean_old(log) -> None:
+    """예전 방식으로 깔린 것을 치운다.
+
+    AutoCAD 는 ApplicationPlugins 아래 번들을 시작할 때 통째로 읽는다.
+    옛 판이 거기 남아 있으면 새로 깐 것을 덮어써, 고쳐도 고쳐도 옛 것이
+    돈다. 실제로 이것 때문에 메뉴가 안 나왔다.
+    """
+    for base in (os.environ.get("APPDATA"), os.environ.get("PROGRAMDATA")):
+        if not base:
+            continue
+        b = Path(base) / "Autodesk" / "ApplicationPlugins" / "CADMAP.bundle"
+        if b.exists():
+            shutil.rmtree(b, ignore_errors=True)
+            log(f"옛 번들 제거  {b}")
+
+
 def do_install(targets: list[dict], key: str, log) -> None:
+    clean_old(log)
     DEST.mkdir(parents=True, exist_ok=True)
     src = bundled(LSP_NAME)
     dst = DEST / LSP_NAME
@@ -263,6 +280,7 @@ def do_uninstall(all_acad: list[dict], log) -> None:
     if DEST.exists():
         shutil.rmtree(DEST, ignore_errors=True)
         log(f"파일 삭제   {DEST}")
+    clean_old(log)
     log("발급키는 남겨 두었습니다. 다시 설치하면 그대로 쓰입니다.")
 
 
