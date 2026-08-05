@@ -170,8 +170,9 @@ function metrics(s) {
 
 /* ── 패널 갱신 ────────────────────────────────── */
 function selectedLayers() {
-  return [...document.querySelectorAll('[data-lay]')]
-    .filter(c => c.checked && !c.disabled).map(c => c.dataset.lay);
+  // 지적선과 지번은 늘 들어간다. 화면에는 고를 것이 없다.
+  return ['parcel', 'pnu', ...[...document.querySelectorAll('[data-lay]')]
+    .filter(c => c.checked && !c.disabled).map(c => c.dataset.lay)];
 }
 
 function refreshSummary() {
@@ -179,7 +180,7 @@ function refreshSummary() {
   const info = crsInfo[code] || {};
   const layers = selectedLayers();
 
-  $('layState').textContent = `${layers.length}개 선택`;
+  $('layState').textContent = `고정 2 + 선택 ${layers.length - 2}`;
   $('s-lay').textContent = `${layers.length} 개`;
   $('s-crs').textContent = `EPSG:${code}`;
   $('sb-crs').textContent = `EPSG:${code} · ${info.wkt_name || ''}`;
@@ -287,8 +288,7 @@ function schedulePreview() {
 }
 
 async function loadParcelPreview() {
-  const wantParcel = document.querySelector('[data-lay="parcel"]').checked
-    || document.querySelector('[data-lay="pnu"]').checked;
+  const wantParcel = true;   // 지적선은 늘 그린다
   if (!wantParcel || !CFG || !CFG.has_vworld_key || map.getView().getZoom() < 16) {
     parcelSource.clear();
     return;

@@ -36,6 +36,43 @@
 
   <div class="workspace">
 
+    <aside class="panel lpanel">
+      <div class="lp-head">
+        <span class="lp-title">주제도</span>
+        <span class="step-hint" id="layState">고정 2</span>
+      </div>
+      <div class="panel-scroll">
+
+        <div class="laygroup">
+          <div class="laygroup-t">기본 포함 · 항상 추출됩니다</div>
+          <div class="lay fixed">
+            <span class="swatch" style="background:var(--l-parcel)"></span>
+            <span class="lay-name">필지 경계</span><span class="lay-code">D-PARCEL</span></div>
+          <div class="lay fixed">
+            <span class="swatch fill" style="background:var(--l-label);opacity:.7"></span>
+            <span class="lay-name">지번 · 지목</span><span class="lay-code">D-PNU-TEXT</span></div>
+        </div>
+
+        <div class="laygroup" style="margin-top:14px">
+          <div class="laygroup-t">도시계획 · 지역지구 — 지도에 보이고 함께 추출</div>
+          <div id="planGroups"></div>
+          <p class="planhelp" id="planHelp">종류마다 레이어가 갈려 들어오고,
+            선에 이름이 적힙니다.</p>
+        </div>
+
+        <div class="laygroup" style="margin-top:14px">
+          <div class="laygroup-t">주제도 겹쳐보기 — 보기 전용
+            <span class="step-hint" id="themeState" style="margin-left:auto">0개</span></div>
+          <input type="search" id="themeSearch" class="theme-search"
+                 placeholder="주제도 검색  (예: 용도, 하천, 학교…)">
+          <div id="themeList" class="theme-list"></div>
+          <p class="planhelp">V-World가 그려 주는 그림을 그대로 얹습니다.
+            <b>추출</b> 표시가 있는 것만 DXF로 받을 수 있습니다.</p>
+        </div>
+
+      </div>
+    </aside>
+
     <section class="mapwrap">
       <div id="map" class="rect"></div>
 
@@ -167,54 +204,7 @@
       <div class="panel-scroll">
 
         <section class="step">
-          <div class="step-head"><span class="step-n">01</span><span class="step-t">영역 지정</span>
-            <span class="step-hint" id="areaState">미지정</span></div>
-          <div class="seg" role="group" aria-label="영역 지정 방식">
-            <button data-mode="draw" aria-pressed="true">지도에서 그리기</button>
-            <button data-mode="coord" aria-pressed="false">경위도 입력</button>
-          </div>
-          <div class="coordinput" id="coordinput">
-            <div><label>MIN LON</label><input type="text" id="in-minlon" placeholder="126.9400"></div>
-            <div><label>MIN LAT</label><input type="text" id="in-minlat" placeholder="37.1800"></div>
-            <div><label>MAX LON</label><input type="text" id="in-maxlon" placeholder="126.9500"></div>
-            <div><label>MAX LAT</label><input type="text" id="in-maxlat" placeholder="37.1870"></div>
-            <div class="full"><button class="mini-btn" id="applyCoord">이 영역 적용</button></div>
-          </div>
-        </section>
-
-        <section class="step">
-          <div class="step-head"><span class="step-n">02</span><span class="step-t">추출 레이어</span>
-            <span class="step-hint" id="layState">2개 선택</span></div>
-
-          <div class="laygroup">
-            <div class="laygroup-t">추출 항목</div>
-            <label class="lay"><input type="checkbox" data-lay="parcel" checked>
-              <span class="swatch" style="background:var(--l-parcel)"></span>
-              <span class="lay-name">필지 경계</span><span class="lay-code">D-PARCEL</span></label>
-            <label class="lay"><input type="checkbox" data-lay="pnu" checked>
-              <span class="swatch fill" style="background:var(--l-label);opacity:.7"></span>
-              <span class="lay-name">지번 · 지목</span><span class="lay-code">D-PNU-TEXT</span></label>
-          </div>
-
-          <div id="planGroups"></div>
-          <p class="planhelp" id="planHelp">도시계획·지역지구는 종류마다 레이어가
-            갈려 들어오고, 선에 이름이 적힙니다.</p>
-        </section>
-
-        <section class="step">
-          <div class="step-head"><span class="step-n">02+</span>
-            <span class="step-t">주제도 겹쳐보기</span>
-            <span class="step-hint" id="themeState">0개 표시</span></div>
-          <input type="search" id="themeSearch" class="theme-search"
-                 placeholder="주제도 검색  (예: 용도, 하천, 학교…)">
-          <div id="themeList" class="theme-list"></div>
-          <p class="planhelp"><b>지도에 보기만</b> 하는 기능입니다. V-World가
-            그려 주는 그림을 그대로 얹으므로 포털과 같은 모습입니다.
-            <b>추출</b> 표시가 있는 것만 DXF로 받을 수 있습니다.</p>
-        </section>
-
-        <section class="step">
-          <div class="step-head"><span class="step-n">03</span><span class="step-t">출력 좌표계</span></div>
+          <div class="step-head"><span class="step-n">01</span><span class="step-t">출력 좌표계</span></div>
           <select id="crs" aria-label="출력 좌표계"></select>
           <dl class="crs-meta">
             <dt>투영</dt><dd id="m-proj">—</dd>
@@ -229,7 +219,7 @@
         </section>
 
         <section class="step">
-          <div class="step-head"><span class="step-n">04</span><span class="step-t">출력 설정</span></div>
+          <div class="step-head"><span class="step-n">02</span><span class="step-t">출력 설정</span></div>
           <div class="optrow"><label for="ver">DXF 버전</label>
             <select id="ver">
               <option value="AC1032">AutoCAD 2018</option>
@@ -254,9 +244,19 @@
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L15 14H1L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.2v3.4M8 11.6v.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <span id="bigNoticeTxt"></span>
         </div>
+        <details class="coorddet">
+          <summary>경위도로 영역 지정</summary>
+          <div class="coordinput on" id="coordinput">
+            <div><label>MIN LON</label><input type="text" id="in-minlon" placeholder="126.9400"></div>
+            <div><label>MIN LAT</label><input type="text" id="in-minlat" placeholder="37.1800"></div>
+            <div><label>MAX LON</label><input type="text" id="in-maxlon" placeholder="126.9500"></div>
+            <div><label>MAX LAT</label><input type="text" id="in-maxlat" placeholder="37.1870"></div>
+            <div class="full"><button class="mini-btn" id="applyCoord">이 영역 적용</button></div>
+          </div>
+        </details>
         <div class="summary">
           <div class="sum-row"><span>선택 면적</span><span id="s-area">—</span></div>
-          <div class="sum-row"><span>추출 레이어</span><span id="s-lay">2 개</span></div>
+          <div class="sum-row"><span>추출 자료</span><span id="s-lay">2 개</span></div>
           <div class="sum-row"><span>좌표계</span><span id="s-crs">—</span></div>
           <div class="sum-row total"><span>1회 추출 한도</span><span id="s-limit">—</span></div>
         </div>
