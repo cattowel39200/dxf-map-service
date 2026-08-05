@@ -186,20 +186,61 @@ def _write_startup(k, paths: list[str]) -> None:
     winreg.SetValueEx(k, "NumStartup", 0, winreg.REG_DWORD, len(paths))
 
 
-def register(acad: dict, loader: Path) -> None:
-    """AutoCAD 가 켜질 때 이 리습을 스스로 불러오게 한다.
+BUNDLE = (Path(os.environ.get("APPDATA", Path.home()))
+          / "Autodesk" / "ApplicationPlugins" / "CADMAP.bundle")
 
-    리습은 APPLOAD 의 '시작 세트'에 넣어야 불린다. Applications 키는
-    ARX(.arx/.dll) 전용이라 .lsp 를 적어 두어도 아무 일도 일어나지 않는다.
+PACKAGE_XML = """<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="AutoCAD"
+    Name="{name}" AppVersion="{ver}" ProductType="Application"
+    Description="{name}" Author="{company}">
+  <CompanyDetails Name="{company}" Url="{site}"/>
+  <Components Description="AutoCAD">
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD" SeriesMin="R18.0"/>
+    <ComponentEntry AppName="CADMAP" Version="{ver}"
+        ModuleName="./Contents/{lsp}" LoadOnAutoCADStartup="True"/>
+  </Components>
+</ApplicationPackage>
+"""
+
+
+def install_bundle(src: Path, log) -> Path:
+    """AutoCAD 가 시작할 때 스스로 읽는 자리에 넣는다.
+
+    ApplicationPlugins 아래 번들은 AutoCAD 가 켜질 때 통째로 읽는다.
+    레지스트리를 건드리지 않고, 프로파일이 바뀌어도 살아남으며, 관리자
+    권한도 필요 없다. Autodesk 가 권하는 배포 방식이기도 하다.
+
+    APPLOAD 의 시작 세트는 AutoCAD 가 끝나면서 프로파일을 통째로 되쓰는
+    탓에 적어 두어도 사라지는 일이 있다.
     """
-    want = str(loader)
+    con = BUNDLE / "Contents"
+    con.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, con / LSP_NAME)
+    (BUNDLE / "PackageContents.xml").write_text(
+        PACKAGE_XML.format(name=APP_NAME, ver=VERSION, company=COMPANY,
+                           site=SITE, lsp=LSP_NAME),
+        encoding="utf-8")
+    log(f"자동 실행   {BUNDLE}")
+    return con / LSP_NAME
+
+
+def register(acad: dict, loader: Path) -> None:
+    """예전에 잘못 넣어 둔 자국을 치운다.
+
+    이제 불러오기는 번들이 맡는다. 시작 세트에 남아 있으면 같은 파일이
+    두 번 불려 메뉴가 겹친다.
+    """
     for prof in _profiles(acad):
         path = f"{prof}\\Dialogs\\Appload\\Startup"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path) as k:
-            cur = _startup_list(k)
-            if any(x.lower() == want.lower() for x in cur):
-                continue
-            _write_startup(k, cur + [want])
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path,
+                                0, winreg.KEY_ALL_ACCESS) as k:
+                cur = _startup_list(k)
+                keep = [x for x in cur if LSP_NAME.lower() not in x.lower()]
+                if len(keep) != len(cur):
+                    _write_startup(k, keep)
+        except OSError:
+            pass
 
 
 def unregister(acad: dict) -> bool:
@@ -246,23 +287,21 @@ def clean_old(log) -> None:
     옛 판이 거기 남아 있으면 새로 깐 것을 덮어써, 고쳐도 고쳐도 옛 것이
     돈다. 실제로 이것 때문에 메뉴가 안 나왔다.
     """
-    for base in (os.environ.get("APPDATA"), os.environ.get("PROGRAMDATA")):
-        if not base:
-            continue
-        b = Path(base) / "Autodesk" / "ApplicationPlugins" / "CADMAP.bundle"
-        if b.exists():
-            shutil.rmtree(b, ignore_errors=True)
-            log(f"옛 번들 제거  {b}")
+    b = Path(os.environ.get("PROGRAMDATA", "")) / "Autodesk" /         "ApplicationPlugins" / "CADMAP.bundle"
+    if b.exists():
+        shutil.rmtree(b, ignore_errors=True)
+        log(f"옛 번들 제거  {b}")
 
 
 def do_install(targets: list[dict], key: str, log) -> None:
-    clean_old(log)
     DEST.mkdir(parents=True, exist_ok=True)
     src = bundled(LSP_NAME)
     dst = DEST / LSP_NAME
     shutil.copyfile(src, dst)
     log(f"파일 복사   {dst}")
 
+    # AutoCAD 가 읽는 것은 번들 안의 사본이다. 자동 업데이트도 그것을 고친다.
+    dst = install_bundle(src, log)
     save_setting("Path", str(dst))
     save_setting("Version", VERSION)
     if key:
@@ -277,9 +316,10 @@ def do_install(targets: list[dict], key: str, log) -> None:
 def do_uninstall(all_acad: list[dict], log) -> None:
     n = sum(1 for a in all_acad if unregister(a))
     log(f"자동 실행 해제  {n}개")
-    if DEST.exists():
-        shutil.rmtree(DEST, ignore_errors=True)
-        log(f"파일 삭제   {DEST}")
+    for d in (BUNDLE, DEST):
+        if d.exists():
+            shutil.rmtree(d, ignore_errors=True)
+            log(f"파일 삭제   {d}")
     clean_old(log)
     log("발급키는 남겨 두었습니다. 다시 설치하면 그대로 쓰입니다.")
 

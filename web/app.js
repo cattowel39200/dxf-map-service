@@ -1070,3 +1070,68 @@ $('ctxEum').onclick = async () => {
     showError(e.message);
   }
 };
+
+
+/* ── 주제도 겹쳐보기 ──────────────────────────────────────────
+   V-World 가 그려 주는 그림(WMS)을 그대로 얹는다. 포털의 주제도와 같다.
+   보기 전용이고, 추출은 벡터가 되는 것만 된다. */
+const themeOn = new Set();
+let themeLayer = null;
+
+function themeApply() {
+  const names = [...themeOn].join(',');
+  document.getElementById('themeState').textContent = `${themeOn.size}개 표시`;
+  if (!names) {
+    if (themeLayer) { map.removeLayer(themeLayer); themeLayer = null; }
+    return;
+  }
+  const params = { LAYERS: names, STYLES: names, VERSION: '1.3.0',
+                   FORMAT: 'image/png', TRANSPARENT: 'true' };
+  if (themeLayer) {
+    themeLayer.getSource().updateParams(params);
+  } else {
+    themeLayer = new ol.layer.Image({
+      zIndex: 1, opacity: 0.75,
+      source: new ol.source.ImageWMS({
+        url: '/api/wms', params, ratio: 1.1, crossOrigin: 'anonymous' }),
+    });
+    map.addLayer(themeLayer);
+  }
+}
+
+(async () => {
+  const list = document.getElementById('themeList');
+  if (!list) return;
+  let rows = [];
+  try {
+    rows = (await (await fetch('/api/themes')).json()).themes || [];
+  } catch {
+    list.innerHTML = '<div class="theme-empty">주제도 목록을 받지 못했습니다.</div>';
+    return;
+  }
+  const esc = s => String(s ?? '').replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const render = q => {
+    const hit = q ? rows.filter(r => r.title.includes(q)) : rows;
+    list.innerHTML = hit.length ? hit.map(r => `
+      <label class="theme-row">
+        <input type="checkbox" data-theme="${esc(r.name)}"
+               ${themeOn.has(r.name) ? 'checked' : ''}>
+        <span>${esc(r.title)}</span>
+        <span class="tag${r.extract ? '' : ' view'}">${r.extract ? '추출' : '보기'}</span>
+      </label>`).join('')
+      : '<div class="theme-empty">찾는 주제도가 없습니다.</div>';
+  };
+  render('');
+
+  list.addEventListener('change', e => {
+    const c = e.target.closest('[data-theme]');
+    if (!c) return;
+    if (c.checked) themeOn.add(c.dataset.theme);
+    else themeOn.delete(c.dataset.theme);
+    themeApply();
+  });
+  document.getElementById('themeSearch').addEventListener('input',
+    e => render(e.target.value.trim()));
+})();

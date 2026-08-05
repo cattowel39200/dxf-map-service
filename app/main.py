@@ -521,6 +521,81 @@ async def landuse(lon: float, lat: float):
     }
 
 
+# ── 주제도 (V-World 전체 레이어 겹쳐보기) ─────────────────────
+# V-World 포털의 주제도와 같은 것. 목록은 서버가 GetCapabilities 로 받아
+# 하루쯤 들고 있는다. 매번 받으면 130 KB 를 그때마다 나른다.
+_THEMES: dict = {"at": 0.0, "rows": []}
+
+VWORLD_WMS_URL = "https://api.vworld.kr/req/wms"
+
+
+@app.get("/api/themes")
+async def themes():
+    """겹쳐 볼 수 있는 주제도 목록. 추출 가능한 것은 표시해 둔다."""
+    import re as _re
+    import time as _time
+    if not config.VWORLD_KEY:
+        raise HTTPException(503, "V-World 인증키가 설정되지 않았습니다.")
+
+    now = _time.time()
+    if not _THEMES["rows"] or now - _THEMES["at"] > 86400:
+        async with httpx.AsyncClient(timeout=60.0,
+                                     headers={"User-Agent": config.USER_AGENT}) as c:
+            r = await c.get(VWORLD_WMS_URL, params={
+                "SERVICE": "WMS", "REQUEST": "GetCapabilities",
+                "VERSION": "1.3.0", "KEY": config.VWORLD_KEY,
+                "DOMAIN": config.VWORLD_DOMAIN})
+        pairs = _re.findall(r"<Name>([^<]+)</Name>\s*<Title>([^<]*)</Title>", r.text)
+        # 같은 레이어가 이름만 적힌 채 한 번, 한글 제목으로 또 한 번 나온다.
+        # 한글 제목이 있는 쪽을 남긴다.
+        best: dict[str, str] = {}
+        for n, ti in pairs:
+            n = n.strip(); ti = (ti or "").strip()
+            if n.upper() in ("WMS", "VWORLD"):
+                continue
+            if n not in best or (ti and ti.lower() != n.lower()):
+                best[n] = ti
+        vect = {s["source"].lower() for s in layerdef.catalog()}
+        vect |= {"lp_pa_cbnd_bubun"}
+        rows = [{"name": n, "title": ti if ti.lower() != n.lower() else n,
+                 "extract": n.lower() in vect}
+                for n, ti in best.items()]
+        rows.sort(key=lambda x: (not x["extract"], x["title"]))
+        _THEMES.update(at=now, rows=rows)
+    return {"themes": _THEMES["rows"], "count": len(_THEMES["rows"])}
+
+
+@app.get("/api/wms")
+async def wms_proxy(request: Request):
+    """주제도 그림 중계. 인증키를 서버가 붙여 준다."""
+    if not config.VWORLD_KEY:
+        raise HTTPException(503, "V-World 인증키가 설정되지 않았습니다.")
+    allow = {"LAYERS", "STYLES", "CRS", "SRS", "BBOX", "WIDTH", "HEIGHT",
+             "FORMAT", "TRANSPARENT", "VERSION", "BGCOLOR", "EXCEPTIONS"}
+    q = {k.upper(): v for k, v in request.query_params.items()}
+    params = {k: v for k, v in q.items() if k in allow}
+    try:
+        if int(params.get("WIDTH", 0)) > 2048 or int(params.get("HEIGHT", 0)) > 2048:
+            raise HTTPException(400, "그림이 너무 큽니다.")
+    except ValueError:
+        raise HTTPException(400, "크기 값이 올바르지 않습니다.")
+    params.update({"SERVICE": "WMS", "REQUEST": "GetMap",
+                   "KEY": config.VWORLD_KEY, "DOMAIN": config.VWORLD_DOMAIN})
+    params.setdefault("VERSION", "1.3.0")
+    params.setdefault("FORMAT", "image/png")
+    params.setdefault("TRANSPARENT", "true")
+    # V-World 는 STYLES 를 레이어 이름 그대로 요구한다
+    params.setdefault("STYLES", params.get("LAYERS", ""))
+    async with httpx.AsyncClient(timeout=30.0,
+                                 headers={"User-Agent": config.USER_AGENT}) as c:
+        r = await c.get(VWORLD_WMS_URL, params=params)
+    ct = r.headers.get("content-type", "image/png")
+    if r.status_code != 200 or "image" not in ct:
+        return Response(status_code=204)
+    return Response(r.content, media_type=ct,
+                    headers={"Cache-Control": "public, max-age=300"})
+
+
 @app.get("/api/plan")
 async def plan_preview(bbox: str = Query(...), keys: str = ""):
     """지도에 도시계획선을 미리 그려 주기 위한 GeoJSON.

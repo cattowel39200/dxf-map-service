@@ -292,6 +292,22 @@ button{font:inherit;color:inherit}
 .plangrp .all{font-size:10.5px;color:var(--text-3);background:none;border:0;
   cursor:pointer;padding:3px 6px;text-decoration:underline}
 .plangrp .all:hover{color:var(--accent-hi)}
+.theme-search{width:100%;border:1px solid var(--line);background:var(--sunken);
+  border-radius:7px;padding:8px 11px;font:inherit;font-size:12px;color:var(--text);
+  outline:none;margin-bottom:8px}
+.theme-search:focus{border-color:var(--accent);background:var(--panel)}
+.theme-list{max-height:240px;overflow-y:auto;border:1px solid var(--line);
+  border-radius:8px;padding:4px}
+.theme-row{display:flex;align-items:center;gap:8px;padding:4px 7px;border-radius:5px;
+  cursor:pointer;user-select:none;font-size:12px}
+.theme-row:hover{background:var(--sunken)}
+.theme-row .tag{margin-left:auto;font-family:var(--mono);font-size:9px;
+  padding:1px 5px;border-radius:4px;flex:none;
+  background:var(--accent-soft);color:var(--accent-hi);
+  border:1px solid var(--accent-line)}
+.theme-row .tag.view{background:transparent;color:var(--text-3);
+  border-color:var(--line)}
+.theme-empty{padding:14px;text-align:center;font-size:11.5px;color:var(--text-3)}
 .planhelp{font-size:10.5px;color:var(--text-3);line-height:1.6;margin:10px 0 0}
 .planhelp b{color:var(--text-2)}
 .laygroup-t{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:9.5px;

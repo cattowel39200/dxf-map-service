@@ -202,6 +202,18 @@
         </section>
 
         <section class="step">
+          <div class="step-head"><span class="step-n">02+</span>
+            <span class="step-t">주제도 겹쳐보기</span>
+            <span class="step-hint" id="themeState">0개 표시</span></div>
+          <input type="search" id="themeSearch" class="theme-search"
+                 placeholder="주제도 검색  (예: 용도, 하천, 학교…)">
+          <div id="themeList" class="theme-list"></div>
+          <p class="planhelp"><b>지도에 보기만</b> 하는 기능입니다. V-World가
+            그려 주는 그림을 그대로 얹으므로 포털과 같은 모습입니다.
+            <b>추출</b> 표시가 있는 것만 DXF로 받을 수 있습니다.</p>
+        </section>
+
+        <section class="step">
           <div class="step-head"><span class="step-n">03</span><span class="step-t">출력 좌표계</span></div>
           <select id="crs" aria-label="출력 좌표계"></select>
           <dl class="crs-meta">
