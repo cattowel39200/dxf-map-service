@@ -105,6 +105,12 @@ CREATE TABLE IF NOT EXISTS purchases (
 );
 CREATE INDEX IF NOT EXISTS idx_pur_status ON purchases(status, created);
 
+-- 관리자가 화면에서 바꾸는 값 (금액·계좌). 비면 .env 를 쓴다.
+CREATE TABLE IF NOT EXISTS settings (
+    key    TEXT PRIMARY KEY,
+    value  TEXT
+);
+
 -- PC 이전 이력. 자가 이전이 잦으면 여기서 드러난다.
 CREATE TABLE IF NOT EXISTS transfers (
     key      TEXT NOT NULL,

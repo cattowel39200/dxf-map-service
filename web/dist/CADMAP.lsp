@@ -35,7 +35,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.5.0")
+(setq *cm:version* "1.5.1")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -936,7 +936,7 @@
       "■ 정품 신청 방법"
       "   1. 메뉴 [지적도] - [정품신청] 을 누릅니다."
       "   2. 창에 적힌 계좌로 입금하십시오."
-      "      금액은 44,000원이며 부가세가 포함된 금액입니다."
+      "      금액과 계좌는 정품신청 창에 표시됩니다."
       "   3. 입금하실 때 [보내는 분] 이름 자리에 창에 표시된"
       "      PC 번호를 그대로 넣어 주십시오."
       "      이름으로 넣으시면 누구의 입금인지 확인이 늦어집니다."
@@ -1009,6 +1009,13 @@
   (vl-file-delete p)
   (= res 1))
 
+(defun cm:comma (n / s out i c)
+  ;; 44000 -> "44,000"
+  (setq s (itoa (fix n)) out "" i (strlen s))
+  (while (> i 3)
+    (setq out (strcat "," (substr s (- i 2) 3) out) i (- i 3)))
+  (strcat (substr s 1 i) out))
+
 (defun cm:buystate ( / res txt)
   ;; 서버에 지금 신청 상태를 물어본다.
   (setq res (cm:http "GET"
@@ -1016,6 +1023,9 @@
         txt (cadr res))
   (if txt
     (progn
+      ;; 금액과 계좌는 서버가 정한다. 관리자 화면에서 바꾸면 여기 바로 반영된다.
+      (if (cm:jnum txt "amount") (setq *cm:amt* (cm:jnum txt "amount")))
+      (if (cm:jstr txt "bank")   (setq *cm:bank* (cm:jstr txt "bank")))
       (if (cm:jstr txt "req_name") (setq *cm:rnm*  (cm:jstr txt "req_name")))
       (if (cm:jstr txt "contact")  (setq *cm:ct*   (cm:jstr txt "contact")))
       (if (cm:jstr txt "biz_no")   (setq *cm:bno*  (cm:jstr txt "biz_no")))
@@ -1059,9 +1069,8 @@
         "  label = \"정품 신청\";"
         "  : boxed_column {"
         "    label = \"구매 안내\";"
-        "    : text { label = \"금 액     44,000 원   (부가세 포함)\"; }"
-        "    : text { label = \"계 좌     농협  301-0019-9326-91\"; }"
-        "    : text { label = \"예금주    안세종\"; }"
+        "    : text { key = \"amt\";  label = \"\"; width = 44; }"
+        "    : text { key = \"bnk\";  label = \"\"; width = 44; }"
         "    : spacer { height = 0.4; }"
         "    : text { label = \"입금하실 때 [보내는 분] 이름 자리에\"; }"
         "    : text { label = \"아래 PC 번호를 그대로 넣어 주십시오.\"; }"
@@ -1088,6 +1097,9 @@
       (setq id (load_dialog p) res nil)
       (if (and (>= id 0) (new_dialog "cm_buy" id))
         (progn
+          (set_tile "amt" (strcat "금 액     " (cm:comma (cm:n *cm:amt* 44000))
+                                  " 원   (부가세 포함)"))
+          (set_tile "bnk" (strcat "계 좌     " (cm:n *cm:bank* "")))
           (set_tile "pc" (cm:machine))
           (set_tile "ct" (cm:n *cm:ct* ""))
           (set_tile "want" (if *cm:want* "1" "0"))
@@ -1121,15 +1133,16 @@
                   (cm:msg "")
                   (cm:msg "===== 정품신청중 =====")
                   (cm:msg (strcat "  입금자명   " (cm:machine)))
-                  (cm:msg  "  금 액      44,000 원 (부가세 포함)")
-                  (cm:msg  "  계 좌      농협 301-0019-9326-91  예금주 안세종")
+                  (cm:msg (strcat "  금 액      " (cm:comma (cm:n *cm:amt* 44000))
+                                  " 원 (부가세 포함)"))
+                  (cm:msg (strcat "  계 좌      " (cm:n *cm:bank* "")))
                   (cm:msg  "  입금이 확인되면 정품으로 바뀝니다.")
                   (cm:msg "======================")
                   (alert (strcat "정품신청중입니다.\n\n"
                                  "입금자명   " (cm:machine) "\n"
-                                 "금 액      44,000 원 (부가세 포함)\n"
-                                 "계 좌      농협 301-0019-9326-91\n"
-                                 "예금주     안세종\n\n"
+                                 "금 액      " (cm:comma (cm:n *cm:amt* 44000))
+                                 " 원 (부가세 포함)\n"
+                                 "계 좌      " (cm:n *cm:bank* "") "\n\n"
                                  "입금하실 때 보내는 분 이름 자리에\n"
                                  "위 PC 번호를 그대로 넣어 주십시오.")))
                 (alert (strcat "신청하지 못했습니다.\n\n" (cdr r)))))))))))

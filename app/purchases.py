@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 
-from . import config, db
+from . import config, db, settings
 
 FIELDS = ("req_name", "contact", "biz_no", "biz_name", "biz_addr",
           "biz_type")
@@ -32,8 +32,8 @@ def get(key: str) -> dict:
         "ok": True,
         "requested": bool(d) and d.get("status") == "pending",
         "status": d.get("status", "none"),
-        "amount": d.get("amount", config.PRICE),
-        "bank": config.BANK_INFO,
+        "amount": d.get("amount", settings.price()),
+        "bank": settings.bank(),
         "want_invoice": bool(d.get("want_invoice")),
         "invoiced": bool(d.get("invoiced")),
         "machine": d.get("machine", ""),
@@ -77,7 +77,7 @@ def request(key: str, machine: str, biz: dict, want_invoice: bool) -> dict:
                 " amount=?, status='pending', updated=? WHERE key=?",
                 (email, machine, vals["req_name"], vals["contact"],
                  vals["biz_no"], vals["biz_name"], vals["biz_addr"],
-                 vals["biz_type"], int(want_invoice), config.PRICE, now, key))
+                 vals["biz_type"], int(want_invoice), settings.price(), now, key))
         else:
             c.execute(
                 "INSERT INTO purchases (key, email, machine, req_name, contact,"
@@ -86,11 +86,11 @@ def request(key: str, machine: str, biz: dict, want_invoice: bool) -> dict:
                 " VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pending', ?, ?)",
                 (key, email, machine, vals["req_name"], vals["contact"],
                  vals["biz_no"], vals["biz_name"], vals["biz_addr"],
-                 vals["biz_type"], int(want_invoice), config.PRICE, now, now))
+                 vals["biz_type"], int(want_invoice), settings.price(), now, now))
         c.commit()
 
-    return {"ok": True, "machine": machine, "amount": config.PRICE,
-            "bank": config.BANK_INFO}
+    return {"ok": True, "machine": machine, "amount": settings.price(),
+            "bank": settings.bank()}
 
 
 def mark_invoiced(key: str, done: bool = True) -> dict:

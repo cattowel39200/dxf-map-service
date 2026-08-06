@@ -1,7 +1,7 @@
 {
-  "version": "1.5.0",
+  "version": "1.5.1",
   "date": "2026-08-05",
-  "notice": "자료 고르기를 폴더처럼 바꾸고, 선마다 색과 이름을 넣었습니다.",
+  "notice": "정품신청 창의 금액·계좌가 서버 설정을 따릅니다.",
   "min_version": "1.0.0",
   "files": {
     "lisp": "/dist/CADMAP.lsp",

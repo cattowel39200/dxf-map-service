@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import (config, crs, jobs, layers as layerdef, licensing, mailer,
-               notices, purchases, usage)
+               notices, purchases, settings, usage)
 from .geom import BBox
 from .sources import vworld
 
@@ -62,8 +62,8 @@ async def get_config():
         "tile_url": (config.VWORLD_TILE_URL.replace("{key}", config.VWORLD_KEY)
                      if config.TILE_DIRECT and config.VWORLD_KEY else None),
         "tile_layers": TILE_LAYERS,
-        "bank": config.BANK_INFO,
-        "price": config.PRICE,
+        "bank": settings.bank(),
+        "price": settings.price(),
         "demo_days": config.DEMO_DAYS,
         "has_package": (WEB / "download" / "CADMAP-setup.zip").exists(),
         "youtube": config.YOUTUBE_ID,
@@ -772,9 +772,30 @@ async def admin_applicants(request: Request):
                 l["purchase"] = pur[l["key"]]
     return {"applicants": apps,
             "mail_ready": mailer.configured(),
-            "bank": config.BANK_INFO, "demo_days": config.DEMO_DAYS,
-            "price": config.PRICE,
+            "bank": settings.bank(), "demo_days": config.DEMO_DAYS,
+            "price": settings.price(),
             "pending_purchases": purchases.pending_count()}
+
+
+@app.post("/api/admin/settings")
+async def admin_settings(request: Request):
+    """금액과 계좌를 화면에서 바꾼다. 정품신청 창·소개 페이지·메일에 바로 반영된다."""
+    _require_admin(request)
+    b = await request.json()
+    if "price" in b:
+        try:
+            v = int(str(b["price"]).replace(",", "").strip())
+        except ValueError:
+            raise HTTPException(400, "금액은 숫자로 넣어 주세요.")
+        if not 0 < v <= 100_000_000:
+            raise HTTPException(400, "금액이 범위를 벗어났습니다.")
+        settings.set_("price", str(v))
+    if "bank" in b:
+        v = str(b["bank"]).strip()[:120]
+        if not v:
+            raise HTTPException(400, "계좌를 비울 수 없습니다.")
+        settings.set_("bank", v)
+    return {"ok": True, "price": settings.price(), "bank": settings.bank()}
 
 
 @app.post("/api/admin/purchase/{key}/{action}")

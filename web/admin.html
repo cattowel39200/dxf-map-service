@@ -47,6 +47,17 @@ body{overflow:auto}
 .chart .bar:hover .tip{opacity:1}
 .axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:6px}
 
+/* 판매 설정 */
+.setrow{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;max-width:420px}
+.setrow label{font-size:11px;color:var(--text-3)}
+.setrow input{border:1px solid var(--line);background:var(--sunken);border-radius:7px;
+  padding:9px 12px;font:inherit;font-size:13px;color:var(--text);outline:none}
+.setrow input:focus{border-color:var(--accent);background:var(--panel)}
+.setrow:has(#setSave){flex-direction:row;gap:10px}
+.setmsg{font-size:12px;color:var(--ok)}
+.setmsg.err{color:var(--danger)}
+.sethelp{font-size:11px;color:var(--text-3);margin:2px 0 0;line-height:1.6}
+
 /* 신청자 관리 */
 .appmail{font-weight:600;font-size:12px}
 .appwho{font-size:11px;color:var(--text-3);margin-top:1px}
@@ -152,6 +163,26 @@ td.mono{font-family:var(--mono);font-size:10.5px}
   </div>
 
   <div class="cards" id="cards"></div>
+
+  <div class="panelbox">
+    <h2>판매 설정</h2>
+    <div class="pad">
+      <div class="setrow">
+        <label for="setPrice">정품 금액 (원 · 부가세 포함)</label>
+        <input type="text" id="setPrice" inputmode="numeric" placeholder="44000">
+      </div>
+      <div class="setrow">
+        <label for="setBank">입금 계좌 (예금주까지 한 줄로)</label>
+        <input type="text" id="setBank" placeholder="농협 301-0019-9326-91 (예금주 안세종)">
+      </div>
+      <div class="setrow" style="align-items:center">
+        <button class="sbtn full" id="setSave" style="padding:8px 18px">저장</button>
+        <span class="setmsg" id="setMsg"></span>
+      </div>
+      <p class="sethelp">저장하면 소개 페이지 · CAD 정품신청 창 · 데모 안내
+        메일에 바로 반영됩니다. 이미 접수된 신청의 금액은 바뀌지 않습니다.</p>
+    </div>
+  </div>
 
   <div class="panelbox">
     <h2>사용 신청자 <span class="cnt" id="appCnt"></span></h2>
@@ -397,6 +428,8 @@ async function loadApplicants() {
     ` · 정품 ${list.filter(a => a.status === 'paid').length}` +
     (d.pending_purchases ? ` · <b style="color:var(--danger)">정품신청중 ${d.pending_purchases}</b>` : '');
   $('mailWarn').classList.toggle('on', !d.mail_ready);
+  if (!$('setPrice').dataset.dirty) $('setPrice').value = d.price ?? '';
+  if (!$('setBank').dataset.dirty) $('setBank').value = d.bank ?? '';
 
   if (!list.length) {
     $('tApp').innerHTML = '<tbody><tr><td class="empty" colspan="5">아직 신청자가 없습니다.</td></tr></tbody>';
@@ -460,6 +493,26 @@ async function loadApplicants() {
       loadApplicants();
     } catch (e) { alert(e.message); }
   });
+
+  ['setPrice', 'setBank'].forEach(i =>
+    $(i).addEventListener('input', () => { $(i).dataset.dirty = '1'; }));
+  $('setSave').onclick = async () => {
+    const msg = $('setMsg');
+    msg.className = 'setmsg'; msg.textContent = '저장하는 중…';
+    try {
+      const r = await api('/api/admin/settings', {
+        method: 'POST',
+        body: JSON.stringify({ price: $('setPrice').value, bank: $('setBank').value }),
+      });
+      delete $('setPrice').dataset.dirty; delete $('setBank').dataset.dirty;
+      $('setPrice').value = r.price; $('setBank').value = r.bank;
+      msg.textContent = '저장했습니다.';
+      setTimeout(() => { msg.textContent = ''; }, 2500);
+    } catch (e) {
+      msg.className = 'setmsg err';
+      msg.textContent = e.message;
+    }
+  };
 
   $('tApp').querySelectorAll('[data-pur]').forEach(b => b.onclick = async () => {
     const on = b.dataset.pur === 'invoiced';

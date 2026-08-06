@@ -8,7 +8,7 @@ import ssl
 from email.message import EmailMessage
 from email.utils import formataddr
 
-from . import config
+from . import config, settings
 
 
 class MailError(RuntimeError):
@@ -87,7 +87,7 @@ def demo_body(key: str, name: str = "") -> tuple[str, str]:
 전환 시 프로그램을 다시 설치하거나 키를 새로 받으실 필요가 없습니다.
 같은 키가 그대로 무기한 사용 가능해집니다.
 
-  {config.BANK_INFO}
+  {settings.bank()}
 
 입금 후 이 메일에 회신해 주시면 확인하고 바로 전환해 드립니다.
 
