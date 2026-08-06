@@ -1,0 +1,8 @@
+{
+  "version": "1.5.2-ic",
+  "notice": "AutoCAD 아닌 CAD(캐디안 등)용 시험판입니다.",
+  "min_version": "0.0.0",
+  "files": {
+    "lisp": "/dist/cadian/CADMAP.lsp"
+  }
+}
