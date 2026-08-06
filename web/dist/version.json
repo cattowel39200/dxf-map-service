@@ -1,7 +1,7 @@
 {
-  "version": "1.5.1",
+  "version": "1.5.2",
   "date": "2026-08-05",
-  "notice": "정품신청 창의 금액·계좌가 서버 설정을 따릅니다.",
+  "notice": "접수된 신청은 접수 시점 금액이 표시됨을 창에 밝혔습니다.",
   "min_version": "1.0.0",
   "files": {
     "lisp": "/dist/CADMAP.lsp",

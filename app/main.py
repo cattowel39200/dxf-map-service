@@ -792,8 +792,11 @@ async def admin_settings(request: Request):
         settings.set_("price", str(v))
     if "bank" in b:
         v = str(b["bank"]).strip()[:120]
-        if not v:
-            raise HTTPException(400, "계좌를 비울 수 없습니다.")
+        # "0" 같은 값이 저장되면 CAD 정품신청 창의 계좌가 빈칸이 된다.
+        # 은행 이름과 계좌번호가 다 들어 있는 꼴만 받는다.
+        if len(v) < 10 or sum(ch.isdigit() for ch in v) < 6:
+            raise HTTPException(400, "계좌는 은행 이름과 번호를 함께 적어 주세요."
+                                     "  (예: 농협 301-0000-0000-00 (예금주 홍길동))")
         settings.set_("bank", v)
     return {"ok": True, "price": settings.price(), "bank": settings.bank()}
 

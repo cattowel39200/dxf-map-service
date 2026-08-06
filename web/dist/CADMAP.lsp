@@ -35,7 +35,7 @@
 ;; 1회 추출 한도 고정 (km2)
 (setq *cm:limit* 1.0)
 ;; 이 파일의 판. 서버 version.json 과 견주어 업데이트를 알린다.
-(setq *cm:version* "1.5.1")
+(setq *cm:version* "1.5.2")
 
 (setq *cm:crslist*
   '(("5186"  . "중부원점 (세계측지계)")
@@ -1098,7 +1098,9 @@
       (if (and (>= id 0) (new_dialog "cm_buy" id))
         (progn
           (set_tile "amt" (strcat "금 액     " (cm:comma (cm:n *cm:amt* 44000))
-                                  " 원   (부가세 포함)"))
+                                  " 원   "
+                                  (if sent "(접수하신 신청의 금액입니다)"
+                                           "(부가세 포함)")))
           (set_tile "bnk" (strcat "계 좌     " (cm:n *cm:bank* "")))
           (set_tile "pc" (cm:machine))
           (set_tile "ct" (cm:n *cm:ct* ""))
